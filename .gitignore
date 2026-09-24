@@ -10,8 +10,10 @@ config.toml
 # Build output
 /bin/
 /dist/
-llmctl
-llmctl.exe
+# Anchored to the repo root: an unanchored 'llmctl' would also ignore
+# cmd/llmctl/, which is source.
+/llmctl
+/llmctl.exe
 
 # Evaluation artifacts too large or too local to track
 /eval/results/*.jsonl

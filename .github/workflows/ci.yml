@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is the v1 target; macOS is the check only our macOS member
+        # can run, and the cheapest proof no Windows assumption has leaked.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: go build ./...
+      - run: go vet ./...
+      - name: gofmt
+        if: matrix.os == 'ubuntu-latest'
+        run: test -z "$(gofmt -l .)" || (gofmt -l .; exit 1)
+      - run: go test ./...
+
+  cross-compile:
+    name: cross-compile (CGO_ENABLED=0)
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: GOOS=windows GOARCH=amd64 go build -o /dev/null ./...
+      - run: GOOS=darwin  GOARCH=arm64 go build -o /dev/null ./...
+      - run: GOOS=linux   GOARCH=amd64 go build -o /dev/null ./...
+
+  os-isolation:
+    name: OS isolation guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/check_os_isolation.sh
