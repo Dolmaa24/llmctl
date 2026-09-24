@@ -25,7 +25,7 @@ jobs:
       - name: gofmt
         if: matrix.os == 'ubuntu-latest'
         run: test -z "$(gofmt -l .)" || (gofmt -l .; exit 1)
-      - run: go test ./...
+      - run: go test -timeout 2m ./...
 
   cross-compile:
     name: cross-compile (CGO_ENABLED=0)
