@@ -1,0 +1,25 @@
+# Local state — never commit. Set up before any config/storage code exists.
+*.db
+*.db-journal
+*.db-wal
+*.age
+config.toml
+.env
+.env.local
+
+# Build output
+/bin/
+/dist/
+llmctl
+llmctl.exe
+
+# Evaluation artifacts too large or too local to track
+/eval/results/*.jsonl
+!/eval/results/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
