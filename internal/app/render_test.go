@@ -6,45 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// render drives the model the way Bubble Tea would: size it, feed it keys,
-// then ask for a frame.
-func render(t *testing.T, w, h int, keys ...string) string {
-	t.Helper()
-	providers, messages, notes, checks := DemoState()
-	var m tea.Model = New(providers, messages, notes, checks)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
-	for _, k := range keys {
-		var msg tea.Msg
-		switch k {
-		case "tab":
-			msg = tea.KeyMsg{Type: tea.KeyTab}
-		case "enter":
-			msg = tea.KeyMsg{Type: tea.KeyEnter}
-		case "down":
-			msg = tea.KeyMsg{Type: tea.KeyDown}
-		default:
-			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
-		}
-		var cmd tea.Cmd
-		m, cmd = m.Update(msg)
-		// Sub-models report decisions by returning a command; run it and feed
-		// the result back, exactly as the runtime does.
-		if cmd != nil {
-			if out := cmd(); out != nil {
-				m, _ = m.Update(out)
-			}
-		}
-	}
-	return m.View()
-}
+// Keys that reach the provider list from the composer, where focus starts.
+var toProviders = []string{"tab"}
 
 func TestRendersAllPanesAtStandardSize(t *testing.T) {
 	out := render(t, 120, 32)
-	for _, want := range []string{"PROVIDERS", "TRANSCRIPT", "NOTES", "Anthropic", "wsl"} {
+	for _, want := range []string{"PROVIDERS", "TRANSCRIPT", "NOTES", "MESSAGE", "Anthropic", "wsl"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("frame is missing %q", want)
 		}
@@ -53,16 +23,14 @@ func TestRendersAllPanesAtStandardSize(t *testing.T) {
 
 // The divider is the visible evidence of a mid-session switch (SRS FR-3.6).
 func TestTranscriptShowsSwitchDivider(t *testing.T) {
-	out := render(t, 120, 32)
-	if !strings.Contains(out, "switched to ollama") {
+	if !strings.Contains(render(t, 120, 32), "switched to ollama") {
 		t.Error("no provider-switch divider in the transcript")
 	}
 }
 
 // The transcript must open on the newest turn, not the oldest.
 func TestTranscriptOpensOnLatestMessage(t *testing.T) {
-	out := render(t, 120, 32)
-	if !strings.Contains(out, "while preserving the invariant") {
+	if !strings.Contains(render(t, 120, 32), "while preserving the invariant") {
 		t.Error("the end of the latest message is not visible on first render")
 	}
 }
@@ -79,7 +47,7 @@ func TestSupersededNoteIsHidden(t *testing.T) {
 }
 
 func TestSwitchModalOpensAndShowsBothCosts(t *testing.T) {
-	out := render(t, 120, 32, "down", "s")
+	out := render(t, 120, 32, append(toProviders, "s")...)
 	for _, want := range []string{"Switch provider", "full replay", "distilled handoff", "14,500", "2,800"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("modal is missing %q", want)
@@ -93,40 +61,25 @@ func TestSwitchModalOpensAndShowsBothCosts(t *testing.T) {
 
 func TestModalCapturesKeysWhileOpen(t *testing.T) {
 	// Tab would move focus if the modal were not exclusive.
-	out := render(t, 120, 32, "down", "s", "tab")
+	out := render(t, 120, 32, append(toProviders, "s", "tab")...)
 	if !strings.Contains(out, "Switch provider") {
 		t.Error("modal closed or lost focus on a key it should have swallowed")
 	}
 }
 
 func TestEscapeClosesModal(t *testing.T) {
-	out := render(t, 120, 32, "down", "s", "n")
+	out := render(t, 120, 32, append(toProviders, "s", "esc")...)
 	if strings.Contains(out, "Switch provider") {
 		t.Error("modal still open after cancel")
 	}
 }
 
-// No frame may exceed the terminal it was given, or the display will wrap and
-// the layout will tear.
-func TestFrameNeverExceedsTerminalWidth(t *testing.T) {
-	for _, size := range [][2]int{{80, 24}, {100, 30}, {120, 32}, {160, 40}, {60, 20}} {
-		w, h := size[0], size[1]
-		out := render(t, w, h)
-		for i, line := range strings.Split(out, "\n") {
-			if got := lipgloss.Width(line); got > w {
-				t.Errorf("at %dx%d line %d is %d cells wide, limit %d", w, h, i, got, w)
-			}
-		}
-	}
-}
-
-// Every frame must be exactly the terminal's height. Taller and the terminal
-// scrolls, tearing the layout; this is the check whose absence let the first
-// version ship with every pane overflowing its slot.
+// Every frame must be exactly the terminal's height, or the terminal scrolls
+// and the layout tears.
 func TestFrameIsExactlyTerminalHeight(t *testing.T) {
-	for _, size := range [][2]int{{80, 24}, {100, 30}, {120, 32}, {160, 40}, {60, 20}} {
+	for _, size := range sizes {
 		w, h := size[0], size[1]
-		for _, keys := range [][]string{nil, {"tab"}, {"tab", "tab"}, {"down", "s"}} {
+		for _, keys := range [][]string{nil, {"tab"}, {"tab", "tab"}, append(toProviders, "s")} {
 			out := render(t, w, h, keys...)
 			if got := len(strings.Split(out, "\n")); got != h {
 				t.Errorf("at %dx%d after %v: frame is %d rows, want %d", w, h, keys, got, h)
@@ -134,6 +87,20 @@ func TestFrameIsExactlyTerminalHeight(t *testing.T) {
 		}
 	}
 }
+
+// No frame may exceed the terminal width, or lines wrap and the layout tears.
+func TestFrameNeverExceedsTerminalWidth(t *testing.T) {
+	for _, size := range sizes {
+		w, h := size[0], size[1]
+		for i, line := range strings.Split(render(t, w, h), "\n") {
+			if got := lipgloss.Width(line); got > w {
+				t.Errorf("at %dx%d line %d is %d cells wide, limit %d", w, h, i, got, w)
+			}
+		}
+	}
+}
+
+var sizes = [][2]int{{80, 24}, {100, 30}, {120, 32}, {160, 40}, {60, 20}}
 
 // ansiSGR matches the colour sequences Lip Gloss emits, so border checks are
 // not thrown off when a colour profile is active.
@@ -148,34 +115,53 @@ var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
 // row count misses a pane that renders too tall, because Frame's MaxHeight
 // clips it back to size. Both failures show up here — a narrow pane leaves
 // spaces after its last corner, and a clipped pane loses its bottom border.
+//
+// The middle column is two panes stacked, transcript over composer, so this
+// also checks that their heights sum to exactly the body height.
 func TestPaneBordersAreIntact(t *testing.T) {
 	top := regexp.MustCompile(`^(╭─+╮)+$`)
 	bottom := regexp.MustCompile(`^(╰─+╯)+$`)
 
-	for _, size := range [][2]int{{80, 24}, {100, 30}, {120, 32}, {160, 40}, {60, 20}} {
-		w, h := size[0], size[1]
-		for _, keys := range [][]string{nil, {"tab"}, {"tab", "tab"}} {
-			lines := strings.Split(render(t, w, h, keys...), "\n")
-			first := ansiSGR.ReplaceAllString(lines[0], "")
-			last := ansiSGR.ReplaceAllString(lines[h-3], "") // above status + help
-
-			if !top.MatchString(first) {
-				t.Errorf("%dx%d %v: top border broken: %q", w, h, keys, first)
-			}
-			if !bottom.MatchString(last) {
-				t.Errorf("%dx%d %v: bottom border broken: %q", w, h, keys, last)
-			}
+	check := func(label, frame string, w, h int) {
+		t.Helper()
+		lines := strings.Split(frame, "\n")
+		first := ansiSGR.ReplaceAllString(lines[0], "")
+		last := ansiSGR.ReplaceAllString(lines[h-3], "") // above status + help
+		if !top.MatchString(first) {
+			t.Errorf("%dx%d %s: top border broken: %q", w, h, label, first)
 		}
+		if !bottom.MatchString(last) {
+			t.Errorf("%dx%d %s: bottom border broken: %q", w, h, label, last)
+		}
+	}
+
+	for _, size := range sizes {
+		w, h := size[0], size[1]
+		for _, keys := range [][]string{nil, {"tab"}, {"tab", "tab"}, {"tab", "tab", "tab"}} {
+			check(strings.Join(keys, ","), render(t, w, h, keys...), w, h)
+		}
+
+		// A pending reply adds the spinner line; a failed one adds a notice.
+		// Neither may change the frame's size.
+		pending := newHarness(t, w, h, nil)
+		pending.typeText("hello")
+		pending.hold("enter")
+		check("pending", pending.view(), w, h)
+
+		failed := newHarness(t, w, h, nil)
+		failed.typeText("hello")
+		failed.hold("enter")
+		failed.press("esc")
+		check("notice", failed.view(), w, h)
 	}
 }
 
 // Moving focus must not change any pane's size.
 func TestFocusDoesNotShiftLayout(t *testing.T) {
-	base := render(t, 120, 32)
-	for _, keys := range [][]string{{"tab"}, {"tab", "tab"}} {
-		out := render(t, 120, 32, keys...)
-		if a, b := len(strings.Split(base, "\n")), len(strings.Split(out, "\n")); a != b {
-			t.Errorf("after %v frame height changed from %d to %d", keys, a, b)
+	base := len(strings.Split(render(t, 120, 32), "\n"))
+	for _, keys := range [][]string{{"tab"}, {"tab", "tab"}, {"tab", "tab", "tab"}} {
+		if got := len(strings.Split(render(t, 120, 32, keys...), "\n")); got != base {
+			t.Errorf("after %v frame height changed from %d to %d", keys, base, got)
 		}
 	}
 }
@@ -183,20 +169,34 @@ func TestFocusDoesNotShiftLayout(t *testing.T) {
 // Narrow terminals drop sidebars rather than crushing the transcript.
 func TestNarrowTerminalDegradesGracefully(t *testing.T) {
 	out := render(t, 60, 20)
-	if !strings.Contains(out, "TRANSCRIPT") {
-		t.Error("transcript should survive at 60 columns")
+	for _, want := range []string{"TRANSCRIPT", "MESSAGE"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("%s should survive at 60 columns", want)
+		}
 	}
-	if strings.Contains(out, "NOTES") {
-		t.Error("notes pane should be dropped at 60 columns")
+	for _, gone := range []string{"NOTES", "PROVIDERS"} {
+		if strings.Contains(out, gone) {
+			t.Errorf("%s should be dropped at 60 columns", gone)
+		}
 	}
 }
 
 // DUMP=1 go test ./internal/app/ -run TestDump -v  prints a frame to look at.
-// DUMP_KEYS="down s" drives it first, e.g. to open the switch modal.
+// DUMP_KEYS="tab s" drives it first; DUMP_TYPE="hi" types into the composer
+// and DUMP_HOLD=1 leaves the resulting request pending.
 func TestDump(t *testing.T) {
 	if os.Getenv("DUMP") == "" {
 		t.Skip("set DUMP=1 to print a frame")
 	}
-	keys := strings.Fields(os.Getenv("DUMP_KEYS"))
-	t.Log("\n" + render(t, 120, 32, keys...))
+	h := newHarness(t, 120, 32, nil)
+	h.press(strings.Fields(os.Getenv("DUMP_KEYS"))...)
+	if s := os.Getenv("DUMP_TYPE"); s != "" {
+		h.typeText(s)
+		if os.Getenv("DUMP_HOLD") != "" {
+			h.hold("enter")
+		} else {
+			h.press("enter")
+		}
+	}
+	t.Log("\n" + h.view())
 }

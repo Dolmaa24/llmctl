@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Dolmaa24/llmctl/internal/app"
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,11 +26,13 @@ func main() {
 		}
 	}
 
-	// Phase 2 replaces this with real state loaded from storage.
+	// Demo mode until the storage repositories and provider adapters land.
+	// Swapping them in replaces these two lines and nothing inside the app.
 	providers, messages, notes, checks := app.DemoState()
+	registry := app.DemoRegistry(900 * time.Millisecond)
 
 	p := tea.NewProgram(
-		app.New(providers, messages, notes, checks),
+		app.New(registry, providers, messages, notes, checks),
 		tea.WithAltScreen(),
 	)
 	if _, err := p.Run(); err != nil {

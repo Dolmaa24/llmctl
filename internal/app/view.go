@@ -1,8 +1,10 @@
 package app
 
 import (
+	"github.com/Dolmaa24/llmctl/internal/ui/composer"
 	"github.com/Dolmaa24/llmctl/internal/ui/styles"
 	"github.com/Dolmaa24/llmctl/internal/ui/switchconfirm"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -17,9 +19,15 @@ const (
 	// minTranscript is the narrowest the reading surface may get before a
 	// sidebar is dropped to make room.
 	minTranscript = 40
+
+	// composerMinRows is the smallest composer that still shows one line of
+	// text, used when the terminal is too short for the full one.
+	composerMinRows = 4
 )
 
-func (m *Model) layout() {
+// layout sizes every pane. It returns a command only when focus has to move
+// because the focused pane no longer fits.
+func (m *Model) layout() tea.Cmd {
 	bodyHeight := m.height - statusHeight - helpHeight
 	if bodyHeight < 6 {
 		bodyHeight = 6
@@ -39,11 +47,24 @@ func (m *Model) layout() {
 	}
 	tw := m.width - pw - nw
 
+	// The composer sits under the transcript in the middle column. On a short
+	// terminal it gives up text rows before the transcript gives up its own.
+	cr := composer.Rows
+	if bodyHeight-cr < 6 {
+		cr = composerMinRows
+	}
+
 	m.providers.SetSize(pw, bodyHeight)
-	m.transcript.SetSize(tw, bodyHeight)
+	m.transcript.SetSize(tw, bodyHeight-cr)
+	m.composer.SetSize(tw, cr)
 	m.notes.SetSize(nw, bodyHeight)
 	m.status.SetWidth(m.width)
 	m.confirm.SetSize(m.width, m.height)
+
+	if !m.visible(m.focus) {
+		return m.setFocus(paneComposer)
+	}
+	return nil
 }
 
 func (m Model) View() string {
@@ -53,34 +74,44 @@ func (m Model) View() string {
 	if m.width == 0 {
 		return "starting…"
 	}
+	// The modal replaces the screen while open rather than being laid out
+	// beside it, so the panes underneath never reflow.
+	if m.confirm.Visible() {
+		return m.confirm.View()
+	}
+
+	middle := lipgloss.JoinVertical(lipgloss.Left, m.transcript.View(), m.composer.View())
 
 	var cols []string
 	if m.showProviders {
 		cols = append(cols, m.providers.View())
 	}
-	cols = append(cols, m.transcript.View())
+	cols = append(cols, middle)
 	if m.showNotes {
 		cols = append(cols, m.notes.View())
 	}
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
-	screen := lipgloss.JoinVertical(lipgloss.Left, body, m.status.View(), m.help())
-
-	// The modal is drawn over the composed screen rather than beside it, so
-	// the layout underneath never reflows when it opens.
-	if m.confirm.Visible() {
-		return m.confirm.View()
-	}
-	return screen
+	return lipgloss.JoinVertical(lipgloss.Left, body, m.status.View(), m.help())
 }
 
+// help shows the keys that do something in the current context. A static line
+// would advertise "q quit" while the composer is focused, where q types a q.
 func (m Model) help() string {
-	pairs := [][2]string{
-		{"tab", "pane"},
-		{"↑↓", "move"},
-		{"s", "switch"},
-		{"q", "quit"},
+	var pairs [][2]string
+	switch {
+	case m.focus == paneComposer && m.inFlight:
+		pairs = [][2]string{{"esc", "cancel"}, {"tab", "pane"}, {"ctrl+c", "quit"}}
+	case m.focus == paneComposer:
+		pairs = [][2]string{{"enter", "send"}, {"alt+enter", "newline"}, {"tab", "pane"}, {"ctrl+c", "quit"}}
+	case m.focus == paneProviders:
+		pairs = [][2]string{{"↑↓", "move"}, {"s", "switch"}, {"tab", "pane"}, {"q", "quit"}}
+	case m.focus == paneNotes:
+		pairs = [][2]string{{"↑↓", "scroll"}, {"t", "filter"}, {"tab", "pane"}, {"q", "quit"}}
+	default:
+		pairs = [][2]string{{"↑↓", "scroll"}, {"tab", "pane"}, {"q", "quit"}}
 	}
+
 	var out string
 	for i, p := range pairs {
 		if i > 0 {
@@ -88,12 +119,12 @@ func (m Model) help() string {
 		}
 		out += styles.Key.Render(p[0]) + styles.Help.Render(" "+p[1])
 	}
-	return lipgloss.NewStyle().Width(m.width).Padding(0, 1).Render(out)
+	return lipgloss.NewStyle().Width(m.width).MaxHeight(1).Padding(0, 1).Render(out)
 }
 
-// planFor builds the comparison shown before a switch. Phase 2 replaces this
-// with session.HandoffBuilder and costestimate.Estimator; the modal's input
-// shape does not change when it does.
+// planFor builds the comparison shown before a switch. Integration replaces
+// this with session.HandoffBuilder and costestimate.Estimator; the modal's
+// input shape does not change when it does.
 func (m Model) planFor(targetID string) switchconfirm.Plan {
 	from, _ := m.activeProvider()
 	full, distilled, extraction, notes, raw := demoPlanNumbers()
