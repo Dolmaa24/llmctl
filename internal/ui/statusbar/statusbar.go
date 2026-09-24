@@ -35,6 +35,18 @@ func (m *Model) SetChecks(checks []Check) {
 	m.updated = time.Now()
 }
 
+// SetCheck replaces the result of an existing check. A check the bar does not
+// know about is ignored: which checks exist is the diagnostics module's
+// decision, not the caller's.
+func (m *Model) SetCheck(name, status, message string) {
+	for i := range m.checks {
+		if m.checks[i].Name == name {
+			m.checks[i].Status, m.checks[i].Message = status, message
+			return
+		}
+	}
+}
+
 func (m *Model) SetWidth(w int) { m.width = w }
 
 func (m Model) Init() tea.Cmd { return nil }

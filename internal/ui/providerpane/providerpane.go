@@ -111,6 +111,7 @@ func (m Model) View() string {
 
 	if len(m.items) == 0 {
 		b.WriteString(styles.Ghost.Render("none configured"))
+		b.WriteString("\n\n" + styles.Key.Render("a") + styles.Help.Render(" add one"))
 		return styles.Frame(b.String(), m.width, m.height, m.focused)
 	}
 
