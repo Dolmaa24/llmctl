@@ -10,7 +10,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/team260/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 // Adapter is a configurable provider.Adapter.

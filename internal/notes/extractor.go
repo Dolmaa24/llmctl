@@ -5,7 +5,7 @@ package notes
 import (
 	"context"
 
-	"github.com/team260/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 // Extractor produces new notes from recent conversation.

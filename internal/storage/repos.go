@@ -6,7 +6,7 @@ package storage
 import (
 	"context"
 
-	"github.com/team260/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 type SessionsRepo interface {

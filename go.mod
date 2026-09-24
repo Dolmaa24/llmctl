@@ -1,4 +1,4 @@
-module github.com/team260/llmctl
+module github.com/Dolmaa24/llmctl
 
 go 1.25.0
 

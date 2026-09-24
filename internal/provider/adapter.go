@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/team260/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 // ErrContextTooLarge is returned by SendMessage when the assembled history does
