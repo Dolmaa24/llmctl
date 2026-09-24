@@ -47,8 +47,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// The modal is exclusive: while it is open it consumes every key, so a
-	// stray Tab cannot move focus behind an overlay the user is answering.
+	// Ctrl+C is checked before any overlay sees the key. An overlay that
+	// swallowed it would leave the user no way out but killing the terminal.
+	if key.Matches(msg, Keys.ForceQuit) {
+		return m.quit()
+	}
+
+	// The modal is exclusive: while it is open it consumes every other key,
+	// so a stray Tab cannot move focus behind an overlay the user is answering.
 	if m.confirm.Visible() {
 		var cmd tea.Cmd
 		m.confirm, cmd = m.confirm.Update(msg)
@@ -58,8 +64,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Bindings that work everywhere, the composer included. None of them is a
 	// key the user could mean as text.
 	switch {
-	case key.Matches(msg, Keys.ForceQuit):
-		return m.quit()
 	case key.Matches(msg, Keys.NextPane):
 		cmd := m.cycleFocus(+1)
 		return m, cmd

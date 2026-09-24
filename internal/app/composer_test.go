@@ -88,6 +88,16 @@ func TestCtrlCQuitsFromComposer(t *testing.T) {
 	}
 }
 
+// Ctrl+C must quit while the switch modal is open. It used not to: the modal
+// swallowed every key, leaving no way out but killing the terminal.
+func TestCtrlCQuitsFromTheSwitchModal(t *testing.T) {
+	h := newHarness(t, 120, 32, nil)
+	h.press("tab", "s", "ctrl+c")
+	if !h.quitRequested() {
+		t.Error("ctrl+c did not quit while the switch modal was open")
+	}
+}
+
 func TestBlankMessageIsNotSent(t *testing.T) {
 	h := newHarness(t, 120, 32, nil)
 	before := len(h.model().messages)
