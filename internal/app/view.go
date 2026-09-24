@@ -60,6 +60,7 @@ func (m *Model) layout() tea.Cmd {
 	m.notes.SetSize(nw, bodyHeight)
 	m.status.SetWidth(m.width)
 	m.confirm.SetSize(m.width, m.height)
+	m.form.SetSize(m.width, m.height)
 
 	if !m.visible(m.focus) {
 		return m.setFocus(paneComposer)
@@ -74,8 +75,11 @@ func (m Model) View() string {
 	if m.width == 0 {
 		return "starting…"
 	}
-	// The modal replaces the screen while open rather than being laid out
+	// Overlays replace the screen while open rather than being laid out
 	// beside it, so the panes underneath never reflow.
+	if m.form.Visible() {
+		return m.form.View()
+	}
 	if m.confirm.Visible() {
 		return m.confirm.View()
 	}
@@ -105,7 +109,7 @@ func (m Model) help() string {
 	case m.focus == paneComposer:
 		pairs = [][2]string{{"enter", "send"}, {"alt+enter", "newline"}, {"tab", "pane"}, {"ctrl+c", "quit"}}
 	case m.focus == paneProviders:
-		pairs = [][2]string{{"↑↓", "move"}, {"s", "switch"}, {"tab", "pane"}, {"q", "quit"}}
+		pairs = [][2]string{{"↑↓", "move"}, {"s", "switch"}, {"a", "add"}, {"e", "edit"}, {"tab", "pane"}, {"q", "quit"}}
 	case m.focus == paneNotes:
 		pairs = [][2]string{{"↑↓", "scroll"}, {"t", "filter"}, {"tab", "pane"}, {"q", "quit"}}
 	default:

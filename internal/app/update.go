@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/Dolmaa24/llmctl/internal/ui/composer"
+	"github.com/Dolmaa24/llmctl/internal/ui/providerform"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerpane"
 	"github.com/Dolmaa24/llmctl/internal/ui/switchconfirm"
 	"github.com/charmbracelet/bubbles/key"
@@ -26,9 +27,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.receive(msg)
 
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.transcript, cmd = m.transcript.Update(msg)
-		return m, cmd
+		// Both spinners receive every tick; each ignores ticks carrying
+		// another spinner's id.
+		var a, b tea.Cmd
+		m.transcript, a = m.transcript.Update(msg)
+		m.form, b = m.form.Update(msg)
+		return m, tea.Batch(a, b)
+
+	case providerform.SubmitMsg:
+		return m.submitProvider(msg)
+
+	case validatedMsg:
+		return m.receiveValidation(msg)
+
+	case providerform.StopMsg:
+		m.stopValidation()
+		return m, nil
+
+	case providerform.DismissMsg:
+		m.closeProviderForm()
+		return m, nil
 
 	case providerpane.SelectedMsg:
 		m.openSwitch(msg.ID)
@@ -53,8 +71,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.quit()
 	}
 
-	// The modal is exclusive: while it is open it consumes every other key,
-	// so a stray Tab cannot move focus behind an overlay the user is answering.
+	// Overlays are exclusive: while one is open it consumes every other key,
+	// so a stray Tab cannot move focus behind a form the user is filling in.
+	if m.form.Visible() {
+		var cmd tea.Cmd
+		m.form, cmd = m.form.Update(msg)
+		return m, cmd
+	}
 	if m.confirm.Visible() {
 		var cmd tea.Cmd
 		m.confirm, cmd = m.confirm.Update(msg)
@@ -91,6 +114,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.openSwitch(item.ID)
 		}
 		return m, nil
+	case key.Matches(msg, Keys.Add) && m.focus == paneProviders:
+		m.openProviderForm("")
+		return m, nil
+	case key.Matches(msg, Keys.Edit) && m.focus == paneProviders:
+		if item, ok := m.providers.Selected(); ok {
+			m.openProviderForm(item.ID)
+		}
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -106,11 +137,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) quit() (tea.Model, tea.Cmd) {
-	// Cancel any in-flight request so its goroutine can unwind.
+	// Cancel in-flight work so its goroutines can unwind, and drop any key the
+	// form was holding.
 	if m.cancel != nil {
 		m.cancel()
 		m.cancel = nil
 	}
+	m.closeProviderForm()
 	m.quitting = true
 	return m, tea.Quit
 }

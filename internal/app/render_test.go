@@ -143,12 +143,12 @@ func TestPaneBordersAreIntact(t *testing.T) {
 
 		// A pending reply adds the spinner line; a failed one adds a notice.
 		// Neither may change the frame's size.
-		pending := newHarness(t, w, h, nil)
+		pending := newHarness(t, w, h)
 		pending.typeText("hello")
 		pending.hold("enter")
 		check("pending", pending.view(), w, h)
 
-		failed := newHarness(t, w, h, nil)
+		failed := newHarness(t, w, h)
 		failed.typeText("hello")
 		failed.hold("enter")
 		failed.press("esc")
@@ -188,7 +188,7 @@ func TestDump(t *testing.T) {
 	if os.Getenv("DUMP") == "" {
 		t.Skip("set DUMP=1 to print a frame")
 	}
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.press(strings.Fields(os.Getenv("DUMP_KEYS"))...)
 	if s := os.Getenv("DUMP_TYPE"); s != "" {
 		h.typeText(s)

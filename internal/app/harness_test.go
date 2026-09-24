@@ -3,8 +3,10 @@ package app
 import (
 	"testing"
 
+	"github.com/Dolmaa24/llmctl/internal/config"
 	"github.com/Dolmaa24/llmctl/internal/provider"
 	"github.com/Dolmaa24/llmctl/internal/ui/composer"
+	"github.com/Dolmaa24/llmctl/internal/ui/providerform"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,6 +17,7 @@ import (
 type harness struct {
 	t     *testing.T
 	m     tea.Model
+	deps  Deps
 	queue []tea.Cmd
 	seen  []tea.Msg
 
@@ -24,16 +27,44 @@ type harness struct {
 	parked  []tea.Cmd
 }
 
-func newHarness(t *testing.T, w, h int, reg *provider.Registry) *harness {
+// option adjusts the demo services or starting state before the model is
+// built.
+type option func(*Deps, *State)
+
+func newHarness(t *testing.T, w, h int, opts ...option) *harness {
 	t.Helper()
-	if reg == nil {
-		reg = DemoRegistry(0)
+	deps, state := DemoDeps(0), DemoState()
+	for _, o := range opts {
+		o(&deps, &state)
 	}
-	providers, messages, notes, checks := DemoState()
-	hh := &harness{t: t, m: New(reg, providers, messages, notes, checks)}
+	hh := &harness{t: t, m: New(deps, state), deps: deps}
 	hh.deliver(tea.WindowSizeMsg{Width: w, Height: h})
 	hh.run()
 	return hh
+}
+
+// withAdapters replaces demo adapters with the given ones, by name.
+func withAdapters(adapters ...provider.Adapter) option {
+	return func(d *Deps, _ *State) {
+		for _, a := range adapters {
+			d.Registry.Register(a)
+		}
+	}
+}
+
+func withValidator(v ProviderValidator) option {
+	return func(d *Deps, _ *State) { d.Validate = v }
+}
+
+// firstRun starts with nothing configured and no history. The stores are
+// emptied rather than replaced, because the demo adapters read these same
+// stores and must see what the form saves.
+func firstRun() option {
+	return func(d *Deps, s *State) {
+		d.Configs.(*memConfigs).rows = map[string]config.ProviderConfig{}
+		d.Secrets.(*memSecrets).keys = map[string]string{}
+		*s = State{}
+	}
 }
 
 // deliver hands one message to the model and queues the command it returns
@@ -48,11 +79,21 @@ func (h *harness) deliver(msg tea.Msg) {
 	// handling that is what starts one. So parking has to key off the
 	// submission. Stopping after a fixed number of steps instead would leave
 	// the submission itself queued, with nothing yet in flight.
-	if _, ok := msg.(composer.SubmitMsg); ok && h.holding {
+	if h.holding && isSubmission(msg) {
 		h.parked = append(h.parked, cmd)
 		return
 	}
 	h.queue = append(h.queue, cmd)
+}
+
+// isSubmission reports whether msg starts slow work: a message request or a
+// provider validation.
+func isSubmission(msg tea.Msg) bool {
+	switch msg.(type) {
+	case composer.SubmitMsg, providerform.SubmitMsg:
+		return true
+	}
+	return false
 }
 
 // run executes queued commands and feeds their results back in until nothing
@@ -152,6 +193,12 @@ func keyMsg(k string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyUp}
 	case "down":
 		return tea.KeyMsg{Type: tea.KeyDown}
+	case "left":
+		return tea.KeyMsg{Type: tea.KeyLeft}
+	case "right":
+		return tea.KeyMsg{Type: tea.KeyRight}
+	case "ctrl+u":
+		return tea.KeyMsg{Type: tea.KeyCtrlU}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
 }
@@ -159,7 +206,7 @@ func keyMsg(k string) tea.KeyMsg {
 // render is the one-line form for tests that only need a frame.
 func render(t *testing.T, w, h int, keys ...string) string {
 	t.Helper()
-	hh := newHarness(t, w, h, nil)
+	hh := newHarness(t, w, h)
 	hh.press(keys...)
 	return hh.view()
 }

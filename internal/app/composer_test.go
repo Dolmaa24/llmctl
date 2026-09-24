@@ -7,18 +7,8 @@ import (
 	"testing"
 
 	"github.com/Dolmaa24/llmctl/internal/mock"
-	"github.com/Dolmaa24/llmctl/internal/provider"
 	"github.com/Dolmaa24/llmctl/internal/session"
 )
-
-// registryWith is the demo registry with some adapters replaced.
-func registryWith(adapters ...provider.Adapter) *provider.Registry {
-	reg := DemoRegistry(0)
-	for _, a := range adapters {
-		reg.Register(a)
-	}
-	return reg
-}
 
 func lastMessage(h *harness) session.Message {
 	msgs := h.model().messages
@@ -26,7 +16,7 @@ func lastMessage(h *harness) session.Message {
 }
 
 func TestComposerHasFocusOnStart(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.typeText("hi")
 	if got := h.model().composer.Value(); got != "hi" {
 		t.Errorf("composer holds %q, want %q", got, "hi")
@@ -34,7 +24,7 @@ func TestComposerHasFocusOnStart(t *testing.T) {
 }
 
 func TestSendingAppendsMessageAndAttributedReply(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	before := len(h.model().messages)
 
 	h.typeText("How do I test the CAS loop?")
@@ -66,7 +56,7 @@ func TestSendingAppendsMessageAndAttributedReply(t *testing.T) {
 // While the composer has focus, letters are text. "q" must not quit and "s"
 // must not open the switch modal halfway through a sentence.
 func TestLettersInComposerAreText(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.typeText("quick question, should I switch?")
 	if h.quitRequested() {
 		t.Fatal("typing q in the composer quit the program")
@@ -80,7 +70,7 @@ func TestLettersInComposerAreText(t *testing.T) {
 }
 
 func TestCtrlCQuitsFromComposer(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.typeText("half a thought")
 	h.press("ctrl+c")
 	if !h.quitRequested() {
@@ -91,7 +81,7 @@ func TestCtrlCQuitsFromComposer(t *testing.T) {
 // Ctrl+C must quit while the switch modal is open. It used not to: the modal
 // swallowed every key, leaving no way out but killing the terminal.
 func TestCtrlCQuitsFromTheSwitchModal(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.press("tab", "s", "ctrl+c")
 	if !h.quitRequested() {
 		t.Error("ctrl+c did not quit while the switch modal was open")
@@ -99,7 +89,7 @@ func TestCtrlCQuitsFromTheSwitchModal(t *testing.T) {
 }
 
 func TestBlankMessageIsNotSent(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	before := len(h.model().messages)
 	h.press("enter")
 	h.typeText("   ")
@@ -110,7 +100,7 @@ func TestBlankMessageIsNotSent(t *testing.T) {
 }
 
 func TestAltEnterInsertsNewlineWithoutSending(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	before := len(h.model().messages)
 	h.typeText("first line")
 	h.press("alt+enter")
@@ -126,7 +116,7 @@ func TestAltEnterInsertsNewlineWithoutSending(t *testing.T) {
 // The user can draft their next message while waiting, but Enter must not send
 // it until the reply has arrived, or two requests would interleave.
 func TestEnterWhileWaitingKeepsTheDraft(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	before := len(h.model().messages)
 
 	h.typeText("first")
@@ -163,7 +153,7 @@ func TestEscCancelsEvenWhenAdapterIgnoresIt(t *testing.T) {
 			return session.Message{Role: session.RoleAssistant, Content: "late reply"}, nil
 		},
 	}
-	h := newHarness(t, 120, 32, registryWith(stubborn))
+	h := newHarness(t, 120, 32, withAdapters(stubborn))
 	before := len(h.model().messages)
 
 	h.typeText("hello")
@@ -200,7 +190,7 @@ func TestEscCancelsTheAdaptersContext(t *testing.T) {
 			return session.Message{}, ctx.Err()
 		},
 	}
-	h := newHarness(t, 120, 32, registryWith(polite))
+	h := newHarness(t, 120, 32, withAdapters(polite))
 	h.typeText("hello")
 	h.hold("enter")
 	h.press("esc")
@@ -212,7 +202,7 @@ func TestEscCancelsTheAdaptersContext(t *testing.T) {
 
 // A provider failure is reported and the program carries on (SRS NFR-5).
 func TestProviderErrorShowsNoticeAndKeepsRunning(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	// Switch to OpenRouter, whose key the demo marks as expired.
 	h.press("tab", "down", "s", "enter", "shift+tab")
 	before := len(h.model().messages)
@@ -242,7 +232,7 @@ func TestNoticesAreNotSentAsHistory(t *testing.T) {
 			return session.Message{Role: session.RoleAssistant, Content: "ok"}, nil
 		},
 	}
-	h := newHarness(t, 120, 32, registryWith(recorder))
+	h := newHarness(t, 120, 32, withAdapters(recorder))
 	h.typeText("first")
 	h.hold("enter")
 	h.press("esc") // produces a "request cancelled" notice
@@ -265,7 +255,7 @@ func TestAdapterPanicIsContained(t *testing.T) {
 			panic("nil pointer in someone's adapter")
 		},
 	}
-	h := newHarness(t, 120, 32, registryWith(broken))
+	h := newHarness(t, 120, 32, withAdapters(broken))
 	h.typeText("hello")
 	h.press("enter")
 	if n := h.model().transcript.Notice(); !strings.Contains(n, "panicked") {
@@ -277,7 +267,7 @@ func TestAdapterPanicIsContained(t *testing.T) {
 }
 
 func TestSwitchChangesWhereTheNextMessageGoes(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	// Cursor starts on Anthropic, which is not the active provider.
 	h.press("tab", "s", "enter", "shift+tab")
 
@@ -295,7 +285,7 @@ func TestSwitchChangesWhereTheNextMessageGoes(t *testing.T) {
 // The divider is drawn while the reply is pending, so the transcript does not
 // jump a line when the reply lands.
 func TestDividerAppearsBeforeTheReply(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.press("tab", "s", "enter", "shift+tab")
 	h.typeText("hello")
 	h.hold("enter")
@@ -310,7 +300,7 @@ func TestDividerAppearsBeforeTheReply(t *testing.T) {
 }
 
 func TestSwitchingIsBlockedWhileWaiting(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.typeText("hello")
 	h.hold("enter", "tab", "s")
 	if h.model().confirm.Visible() {
@@ -319,7 +309,7 @@ func TestSwitchingIsBlockedWhileWaiting(t *testing.T) {
 }
 
 func TestEnterOnAProviderOpensTheSwitch(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.press("tab", "enter")
 	if !h.model().confirm.Visible() {
 		t.Error("enter on a provider did not open the switch modal")
@@ -327,7 +317,7 @@ func TestEnterOnAProviderOpensTheSwitch(t *testing.T) {
 }
 
 func TestSwitchingToTheActiveProviderDoesNothing(t *testing.T) {
-	h := newHarness(t, 120, 32, nil)
+	h := newHarness(t, 120, 32)
 	h.press("tab", "down", "down", "s") // Ollama, already active
 	if h.model().confirm.Visible() {
 		t.Error("modal offered a switch to the provider already in use")
@@ -336,7 +326,7 @@ func TestSwitchingToTheActiveProviderDoesNothing(t *testing.T) {
 
 // On a narrow terminal, Tab must skip the panes that are not on screen.
 func TestFocusSkipsHiddenPanes(t *testing.T) {
-	h := newHarness(t, 60, 20, nil) // providers and notes are hidden here
+	h := newHarness(t, 60, 20) // providers and notes are hidden here
 	h.press("tab")
 	if h.model().focus != paneTranscript {
 		t.Errorf("focus went to hidden pane %d", h.model().focus)

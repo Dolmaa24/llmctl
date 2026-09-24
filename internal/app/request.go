@@ -47,10 +47,10 @@ func (m Model) send(text string) (tea.Model, tea.Cmd) {
 	}
 	active, ok := m.activeProvider()
 	if !ok {
-		m.transcript.SetNotice("no active provider: select one in the providers pane")
+		m.transcript.SetNotice("no provider configured yet: press tab, then a, to add one")
 		return m, nil
 	}
-	adapter, err := m.registry.Get(active.ID)
+	adapter, err := m.deps.Registry.Get(active.ID)
 	if err != nil {
 		m.transcript.SetNotice(err.Error())
 		return m, nil

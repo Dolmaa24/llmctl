@@ -16,6 +16,10 @@ type KeyMap struct {
 	// Outside the composer only.
 	Quit   key.Binding
 	Switch key.Binding
+
+	// In the provider list only.
+	Add  key.Binding
+	Edit key.Binding
 }
 
 var Keys = KeyMap{
@@ -25,4 +29,6 @@ var Keys = KeyMap{
 	Cancel:    key.NewBinding(key.WithKeys("esc")),
 	Quit:      key.NewBinding(key.WithKeys("q")),
 	Switch:    key.NewBinding(key.WithKeys("s")),
+	Add:       key.NewBinding(key.WithKeys("a")),
+	Edit:      key.NewBinding(key.WithKeys("e")),
 }

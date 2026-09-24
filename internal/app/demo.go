@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
+	"github.com/Dolmaa24/llmctl/internal/config"
 	"github.com/Dolmaa24/llmctl/internal/provider"
 	"github.com/Dolmaa24/llmctl/internal/session"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerpane"
@@ -21,7 +24,7 @@ import (
 // still active. OpenRouter's key has expired: the diagnostics catch it, the
 // provider pane shows it, and a message sent there fails the way a real one
 // would.
-func DemoState() ([]providerpane.Item, []session.Message, []session.Note, []statusbar.Check) {
+func DemoState() State {
 	providers := []providerpane.Item{
 		{ID: "anthropic", Name: "Anthropic", Model: "claude-opus-5", Status: "ok", LatencyM: 412},
 		{ID: "openrouter", Name: "OpenRouter", Model: "meta-llama/llama-3.1-70b", Status: "fail"},
@@ -76,32 +79,95 @@ func DemoState() ([]providerpane.Item, []session.Message, []session.Note, []stat
 		{Name: "ollama", Status: "ok"},
 	}
 
-	return providers, messages, notes, checks
+	return State{Providers: providers, Messages: messages, Notes: notes, Checks: checks}
 }
 
-// DemoRegistry returns stand-in adapters for the three providers, each
-// answering after delay. They satisfy provider.Adapter exactly as the real
-// ones will, so replacing them is a change to main.go and nothing else.
-func DemoRegistry(delay time.Duration) *provider.Registry {
+// DemoDeps returns stand-in services: adapters for the three providers,
+// in-memory config and key stores, and a validator. Each satisfies the same
+// contract interface as the real one, so replacing them is a change to
+// main.go and nothing else.
+//
+// The adapters read the demo key store rather than failing on a fixed flag,
+// so the demo story can be completed: OpenRouter fails while its saved key is
+// the expired one, and works once the user saves a new key in the form.
+func DemoDeps(delay time.Duration) Deps {
+	configs := &memConfigs{rows: map[string]config.ProviderConfig{
+		"anthropic":  {ID: "anthropic", DisplayName: "Anthropic", BaseURL: "https://api.anthropic.com", DefaultModel: "claude-opus-5", Enabled: true},
+		"openrouter": {ID: "openrouter", DisplayName: "OpenRouter", BaseURL: "https://openrouter.ai/api/v1", DefaultModel: "meta-llama/llama-3.1-70b", Enabled: true},
+		"ollama":     {ID: "ollama", DisplayName: "Ollama", BaseURL: "http://localhost:11434", DefaultModel: "llama3.1:8b", Enabled: true},
+	}}
+	secrets := &memSecrets{keys: map[string]string{
+		"anthropic":  "sk-ant-demo-0000",
+		"openrouter": "sk-or-demo-expired",
+	}}
+
 	reg := provider.NewRegistry()
-	reg.Register(demoAdapter{id: "anthropic", model: "claude-opus-5", delay: delay})
-	reg.Register(demoAdapter{id: "openrouter", model: "meta-llama/llama-3.1-70b", delay: delay,
-		fail: errors.New("authentication failed: key expired")})
-	reg.Register(demoAdapter{id: "ollama", model: "llama3.1:8b", delay: delay})
-	return reg
+	for _, id := range []string{"anthropic", "openrouter", "ollama"} {
+		id := id
+		reg.Register(demoAdapter{
+			id:    id,
+			delay: delay,
+			check: func() error { return demoKeyProblem(secrets, id) },
+		})
+	}
+
+	return Deps{
+		Registry: reg,
+		Configs:  configs,
+		Secrets:  secrets,
+		Validate: demoValidator(delay),
+		Kinds:    ProviderKinds(func(string) string { return "" }),
+	}
+}
+
+// demoKeyProblem is what a real provider would say about the saved key.
+func demoKeyProblem(secrets config.SecretStore, id string) error {
+	if id == "ollama" {
+		return nil // no key
+	}
+	key, err := secrets.GetAPIKey(id)
+	if err != nil || key == "" {
+		return errors.New("no API key saved")
+	}
+	if strings.Contains(key, "expired") {
+		return errors.New("authentication failed: key expired")
+	}
+	return nil
+}
+
+// demoValidator accepts a key only if it has the right provider's prefix and
+// is not the expired one. Nothing leaves the machine: a demo that made real
+// network calls would surprise whoever ran it.
+func demoValidator(delay time.Duration) ProviderValidator {
+	return func(ctx context.Context, cfg config.ProviderConfig, key string) error {
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		prefix := map[string]string{"anthropic": "sk-ant-", "openrouter": "sk-or-"}[cfg.ID]
+		if prefix != "" && !strings.HasPrefix(key, prefix) {
+			return fmt.Errorf("authentication failed: this key is not for %s (%s keys start with %s)",
+				cfg.DisplayName, cfg.DisplayName, prefix)
+		}
+		if strings.Contains(key, "expired") {
+			return errors.New("authentication failed: key expired")
+		}
+		return nil
+	}
 }
 
 type demoAdapter struct {
 	id    string
-	model string
 	delay time.Duration
-	fail  error
+	check func() error
 }
 
-func (d demoAdapter) Name() string                                 { return d.id }
-func (d demoAdapter) Validate(ctx context.Context) error           { return d.fail }
-func (d demoAdapter) EstimateTokens(text string) int               { return len(text) / 4 }
-func (d demoAdapter) ListModels(context.Context) ([]string, error) { return []string{d.model}, nil }
+func (d demoAdapter) Name() string                       { return d.id }
+func (d demoAdapter) Validate(ctx context.Context) error { return d.check() }
+func (d demoAdapter) EstimateTokens(text string) int     { return len(text) / 4 }
+
+func (d demoAdapter) ListModels(context.Context) ([]string, error) { return nil, nil }
 
 func (d demoAdapter) GetEnvVars(context.Context) (map[string]string, error) {
 	return map[string]string{}, nil
@@ -116,8 +182,8 @@ func (d demoAdapter) SendMessage(ctx context.Context, model string, history []se
 	case <-ctx.Done():
 		return session.Message{}, ctx.Err()
 	}
-	if d.fail != nil {
-		return session.Message{}, d.fail
+	if err := d.check(); err != nil {
+		return session.Message{}, err
 	}
 
 	asked := ""
@@ -139,6 +205,54 @@ func (d demoAdapter) SendMessage(ctx context.Context, model string, history []se
 			"You wrote %q. This turn carried %d messages of history.", asked, len(history)),
 		CreatedAt: time.Now(),
 	}, nil
+}
+
+// memConfigs is an in-memory config.Store for the demo.
+type memConfigs struct {
+	mu   sync.Mutex
+	rows map[string]config.ProviderConfig
+}
+
+func (s *memConfigs) GetProviderConfig(id string) (config.ProviderConfig, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.rows[id]
+	if !ok {
+		return config.ProviderConfig{}, fmt.Errorf("provider %q is not configured", id)
+	}
+	return c, nil
+}
+
+func (s *memConfigs) SetProviderConfig(c config.ProviderConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rows[c.ID] = c
+	return nil
+}
+
+// memSecrets is an in-memory config.SecretStore for the demo. Unlike the real
+// store it does not encrypt, which is acceptable only because every key it
+// holds is fake and nothing is written to disk.
+type memSecrets struct {
+	mu   sync.Mutex
+	keys map[string]string
+}
+
+func (s *memSecrets) GetAPIKey(id string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	k, ok := s.keys[id]
+	if !ok {
+		return "", fmt.Errorf("no key saved for %q", id)
+	}
+	return k, nil
+}
+
+func (s *memSecrets) SetAPIKey(id, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.keys[id] = key
+	return nil
 }
 
 // demoPlanNumbers supplies the figures the cost modal shows until

@@ -26,15 +26,13 @@ func main() {
 		}
 	}
 
-	// Demo mode until the storage repositories and provider adapters land.
-	// Swapping them in replaces these two lines and nothing inside the app.
-	providers, messages, notes, checks := app.DemoState()
-	registry := app.DemoRegistry(900 * time.Millisecond)
+	// Demo mode until the storage, config and provider modules land.
+	// Replacing these lines with the real services changes nothing inside
+	// the app.
+	deps := app.DemoDeps(900 * time.Millisecond)
+	deps.Kinds = app.ProviderKinds(os.Getenv)
 
-	p := tea.NewProgram(
-		app.New(registry, providers, messages, notes, checks),
-		tea.WithAltScreen(),
-	)
+	p := tea.NewProgram(app.New(deps, app.DemoState()), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "llmctl:", err)
 		os.Exit(1)
