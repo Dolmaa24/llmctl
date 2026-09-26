@@ -29,22 +29,32 @@ var counter costestimate.Heuristic
 
 // fakeModel replies with canned text and records what it was asked.
 type fakeModel struct {
+	name    string // "anthropic" if empty
 	reply   string
 	err     error
 	calls   int
 	model   string
 	history []session.Message
+	prompts []string // the material of every call, in order
 }
 
-func (f *fakeModel) Name() string { return "anthropic" }
+func (f *fakeModel) Name() string {
+	if f.name == "" {
+		return "anthropic"
+	}
+	return f.name
+}
 
 func (f *fakeModel) SendMessage(ctx context.Context, model string, history []session.Message) (session.Message, error) {
 	f.calls++
 	f.model, f.history = model, history
+	if len(history) > 1 {
+		f.prompts = append(f.prompts, history[1].Content)
+	}
 	if f.err != nil {
 		return session.Message{}, f.err
 	}
-	return session.Message{Role: session.RoleAssistant, Content: f.reply, Provider: "anthropic", Model: model}, nil
+	return session.Message{Role: session.RoleAssistant, Content: f.reply, Provider: f.Name(), Model: model}, nil
 }
 
 // prompt is the material the model was given: the notes and the messages.

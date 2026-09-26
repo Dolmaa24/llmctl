@@ -26,6 +26,7 @@ func TestMocksSatisfyContract(t *testing.T) {
 		_ shell.Launcher           = (*Launcher)(nil)
 		_ doctor.Check             = (*Check)(nil)
 		_ notes.Extractor          = (*Extractor)(nil)
+		_ notes.Ledger             = (*Ledger)(nil)
 		_ config.Store             = (*ConfigStore)(nil)
 		_ config.SecretStore       = (*SecretStore)(nil)
 	)

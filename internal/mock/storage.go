@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 
@@ -118,9 +119,14 @@ func (r *NotesRepo) ListBySession(ctx context.Context, sessionID string, include
 	return out, nil
 }
 
+// MarkSuperseded requires the replacement to exist already, as the real
+// table's superseded_by foreign key does.
 func (r *NotesRepo) MarkSuperseded(ctx context.Context, noteID, supersededByID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if !slices.ContainsFunc(r.rows, func(n session.Note) bool { return n.ID == supersededByID }) {
+		return fmt.Errorf("mock: no note %q to supersede with", supersededByID)
+	}
 	for i := range r.rows {
 		if r.rows[i].ID == noteID {
 			r.rows[i].SupersededBy = &supersededByID
