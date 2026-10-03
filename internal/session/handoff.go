@@ -70,7 +70,7 @@ func renderNotes(notes []Note) string {
 // evaluation answers it by measuring retention and cost across a sweep of
 // values rather than by picking one; this default holds until then. Four
 // messages is the last two exchanges.
-const DefaultRecentTurns = 4
+const DefaultRecentTurns = 2
 
 // The builder's dependencies are declared here, as the small interfaces it
 // actually uses, rather than imported. Package storage imports session for

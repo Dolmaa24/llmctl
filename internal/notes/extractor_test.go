@@ -135,8 +135,8 @@ func TestCheapTargetStaysOnTheConversationsProvider(t *testing.T) {
 	}{
 		{"anthropic", notes.Target{Provider: "anthropic", Model: opus}, notes.Target{Provider: "anthropic", Model: haiku}},
 		{"openrouter", notes.Target{Provider: "openrouter", Model: "openai/gpt-5"}, notes.Target{Provider: "openrouter", Model: "anthropic/claude-haiku-4.5"}},
-		// Local: stays on the machine, on the model already loaded.
-		{"ollama", notes.Target{Provider: "ollama", Model: "qwen2.5-coder:3b"}, notes.Target{Provider: "ollama", Model: "qwen2.5-coder:3b"}},
+		// Local: uses the dedicated extraction model.
+		{"ollama", notes.Target{Provider: "ollama", Model: "qwen2.5-coder:3b"}, notes.Target{Provider: "ollama", Model: "llama3.1:8b"}},
 		{"unlisted provider", notes.Target{Provider: "mistral", Model: "mistral-large"}, notes.Target{Provider: "mistral", Model: "mistral-large"}},
 	}
 	for _, c := range cases {

@@ -242,7 +242,7 @@ func TestProvidersAreNeverMixedInAPass(t *testing.T) {
 	if strings.Contains(local.prompts[0], "Opus") || !strings.Contains(local.prompts[0], "asked of qwen") {
 		t.Errorf("the local pass read the wrong turns:\n%s", local.prompts[0])
 	}
-	if hosted.model != haiku || local.model != "qwen2.5-coder:3b" {
+	if hosted.model != haiku || local.model != "llama3.1:8b" {
 		t.Errorf("models: hosted %q, local %q", hosted.model, local.model)
 	}
 	if runs := rg.runs(); len(runs) != 2 || runs[0].ThroughSequenceNum != 1 || runs[1].ThroughSequenceNum != 3 {
@@ -250,7 +250,7 @@ func TestProvidersAreNeverMixedInAPass(t *testing.T) {
 	}
 }
 
-func TestALocalPassUsesTheModelLoadedLast(t *testing.T) {
+func TestALocalPassUsesTheDedicatedModel(t *testing.T) {
 	rg := newRig(t)
 	local := &fakeModel{name: "ollama", reply: `{"notes": []}`}
 	rg.models["ollama"] = local
@@ -261,9 +261,9 @@ func TestALocalPassUsesTheModelLoadedLast(t *testing.T) {
 	if _, err := rg.runner(notes.AtSwitch).BeforeSwitch(bg, rg.sess); err != nil {
 		t.Fatal(err)
 	}
-	// One provider, so one pass, on the model already in memory.
-	if local.calls != 1 || local.model != "llama3.2:3b" {
-		t.Errorf("%d calls on %q, want one on llama3.2:3b", local.calls, local.model)
+	// One provider, so one pass, on the dedicated model.
+	if local.calls != 1 || local.model != "llama3.1:8b" {
+		t.Errorf("%d calls on %q, want one on llama3.1:8b", local.calls, local.model)
 	}
 }
 

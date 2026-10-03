@@ -20,6 +20,7 @@ type Target struct {
 var cheapModels = map[string]string{
 	"anthropic":  "claude-haiku-4-5-20251001",
 	"openrouter": "anthropic/claude-haiku-4.5",
+	"ollama":     "llama3.1:8b",
 }
 
 // CheapTarget chooses where to take notes on a conversation that has been

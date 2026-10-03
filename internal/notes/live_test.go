@@ -133,7 +133,7 @@ func (a *anthropic) SendMessage(ctx context.Context, model string, history []ses
 	for _, c := range out.Content {
 		a.reply += c.Text
 	}
-	a.in, a.out = out.InputTokens, out.OutputTokens
+	a.in, a.out = out.Usage.InputTokens, out.Usage.OutputTokens
 	return session.Message{Role: session.RoleAssistant, Content: a.reply, Provider: "anthropic", Model: model}, nil
 }
 
@@ -186,7 +186,7 @@ func TestLiveExtraction(t *testing.T) {
 		models = []string{cheapModels["anthropic"]}
 	default:
 		newSender = func() liveSender { return &ollama{} }
-		models = []string{"qwen2.5:3b", "llama3.2:3b", "qwen2.5-coder:3b"}
+		models = []string{"qwen2.5-coder:7b", "llama3.1:8b"}
 	}
 	if env := os.Getenv("LIVE_MODELS"); env != "" {
 		models = strings.Split(env, ",")
@@ -213,7 +213,7 @@ func TestLiveExtraction(t *testing.T) {
 				pass, err := x.ExtractPass(ctx, window, existing)
 				elapsed += time.Since(start)
 				reply, ai, ao := sender.last()
-				in, out, actualIn, actualOut = in+pass.InputTokens, out+pass.OutputTokens, actualIn+ai, actualOut+ao
+				in, out, actualIn, actualOut = in+pass.Usage.InputTokens, out+pass.Usage.OutputTokens, actualIn+ai, actualOut+ao
 				if err != nil {
 					t.Logf("pass %d failed: %v\nraw reply:\n%s", i+1, err, reply)
 					continue

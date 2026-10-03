@@ -30,6 +30,10 @@ const (
 	Continuous Schedule = 1
 )
 
+// DefaultSchedule is the baseline schedule used for new runners.
+// Tuned to AtSwitch to prevent background processing from melting laptop GPUs.
+var DefaultSchedule = AtSwitch
+
 // NoteStore is satisfied by storage.NotesRepo.
 type NoteStore interface {
 	Create(ctx context.Context, n *session.Note) error
