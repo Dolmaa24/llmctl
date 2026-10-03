@@ -53,10 +53,11 @@ func Open(ctx context.Context, path string) (*DB, error) {
 // Close releases the database file.
 func (db *DB) Close() error { return db.sql.Close() }
 
-func (db *DB) Sessions() SessionsRepo         { return &sessionsRepo{db.sql} }
-func (db *DB) Messages() MessagesRepo         { return &messagesRepo{db.sql} }
-func (db *DB) Notes() NotesRepo               { return &notesRepo{db.sql} }
-func (db *DB) SwitchEvents() SwitchEventsRepo { return &switchEventsRepo{db.sql} }
+func (db *DB) Sessions() SessionsRepo             { return &sessionsRepo{db.sql} }
+func (db *DB) Messages() MessagesRepo             { return &messagesRepo{db.sql} }
+func (db *DB) Notes() NotesRepo                   { return &notesRepo{db.sql} }
+func (db *DB) SwitchEvents() SwitchEventsRepo     { return &switchEventsRepo{db.sql} }
+func (db *DB) ExtractionRuns() ExtractionRunsRepo { return &extractionRunsRepo{db.sql} }
 
 // timeLayout is fixed-width and always UTC, so timestamps sort correctly as
 // text. Queries that compare created_at across tables depend on that.

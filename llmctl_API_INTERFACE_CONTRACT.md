@@ -83,6 +83,27 @@ type SwitchEvent struct {
 **Owner:** Person 4 (handoff logic) writes this; Person 5 (storage) persists it
 **Consumed by:** `ui/switchconfirm` (reads the estimate before confirming), `storage/switch_events_repo`
 
+### 2.4 `ExtractionRun`
+
+```go
+type ExtractionRun struct {
+    ID                 string
+    SessionID          string
+    ThroughSequenceNum int
+    Provider           string
+    Model              string
+    PromptVersion      string
+    InputTokens        int
+    OutputTokens       int
+    NoteIDs            []string
+    Err                string
+    CreatedAt          time.Time
+}
+```
+
+**Owner:** Person 4 (notes module)
+**Consumed by:** `storage/extraction_runs_repo`, `notes/runner.go`
+
 ---
 
 ## 3. Provider Adapter Interface
@@ -279,6 +300,11 @@ type NotesRepo interface {
 type SwitchEventsRepo interface {
     Create(ctx context.Context, e *session.SwitchEvent) error
     ListBySession(ctx context.Context, sessionID string) ([]session.SwitchEvent, error)
+}
+
+type ExtractionRunsRepo interface {
+    Create(ctx context.Context, r *session.ExtractionRun) error
+    ListBySession(ctx context.Context, sessionID string) ([]session.ExtractionRun, error)
 }
 ```
 

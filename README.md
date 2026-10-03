@@ -55,6 +55,26 @@ check that keeps the multi-platform path open.
 Only `internal/shell/` and `internal/doctor/` may contain OS-specific
 branching. `scripts/check_os_isolation.sh` enforces this in CI.
 
+## Where llmctl keeps its data
+
+| File | Holds | Default location |
+|---|---|---|
+| `config.toml` | Provider profiles. No secrets. | `%APPDATA%\llmctl\` |
+| `secrets.age` | API keys, encrypted with `age` | `%APPDATA%\llmctl\` |
+| `secrets.age.index` | Which providers have a key. No secrets. | `%APPDATA%\llmctl\` |
+| `llmctl.db` | Sessions, messages, notes, switch events, extraction runs | `%APPDATA%\llmctl\` |
+
+The passphrase for `secrets.age` is created on first use and kept in Windows
+Credential Manager, so there is nothing to type. Inside WSL the files live
+under `~/.config/llmctl/` on the Linux filesystem; keep the database off
+`/mnt/c`, where SQLite file locking is unreliable.
+
+| Variable | Effect |
+|---|---|
+| `LLMCTL_CONFIG_DIR` | Directory for the config and secrets files |
+| `LLMCTL_DB_PATH` | Path of the database file |
+| `LLMCTL_NO_KEYRING` | Use a typed passphrase instead of the OS keyring (needed in WSL, which usually has no keyring service) |
+
 ## Contributing
 
 Read `llmctl_API_INTERFACE_CONTRACT.md` first — it is the authority on every
