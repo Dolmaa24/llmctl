@@ -42,8 +42,18 @@ type tomlProvider struct {
 type TOMLStore struct {
 	path string
 
+	// OnChange, if set, is called after a provider has been saved or deleted.
+	// The integrator uses it to keep the providers table in the database in
+	// step with this file, which stays the single source of truth. Set it
+	// before the store is shared between goroutines.
+	OnChange func(cfg ProviderConfig, deleted bool)
+
 	mu        sync.Mutex
 	providers map[string]ProviderConfig
+	// extra holds every top-level setting other than providers exactly as it
+	// was read, so saving a provider never drops settings that another
+	// module, or the user by hand, keeps in the same file.
+	extra map[string]any
 }
 
 var _ Store = (*TOMLStore)(nil)
@@ -63,6 +73,10 @@ func LoadTOML(path string) (*TOMLStore, error) {
 	if _, err := toml.Decode(string(data), &file); err != nil {
 		return nil, fmt.Errorf("config: %s is not valid TOML: %w", path, err)
 	}
+	if _, err := toml.Decode(string(data), &s.extra); err != nil {
+		return nil, fmt.Errorf("config: %s is not valid TOML: %w", path, err)
+	}
+	delete(s.extra, "providers")
 	for id, p := range file.Providers {
 		cfg := ProviderConfig{ID: id, DisplayName: p.DisplayName, BaseURL: p.BaseURL,
 			DefaultModel: p.DefaultModel, Enabled: p.Enabled}
@@ -92,34 +106,42 @@ func (s *TOMLStore) SetProviderConfig(cfg ProviderConfig) error {
 		return err
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	previous, existed := s.providers[cfg.ID]
 	s.providers[cfg.ID] = cfg
-	if err := s.save(); err != nil {
+	err := s.save()
+	if err != nil {
 		if existed {
 			s.providers[cfg.ID] = previous
 		} else {
 			delete(s.providers, cfg.ID)
 		}
-		return err
 	}
-	return nil
+	s.mu.Unlock()
+	// Called outside the lock so the hook may read the store.
+	if err == nil && s.OnChange != nil {
+		s.OnChange(cfg, false)
+	}
+	return err
 }
 
 // DeleteProvider removes a provider profile (SRS FR-1.4).
 func (s *TOMLStore) DeleteProvider(providerID string) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	previous, ok := s.providers[providerID]
 	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("%w: %q", ErrNotConfigured, providerID)
 	}
 	delete(s.providers, providerID)
-	if err := s.save(); err != nil {
+	err := s.save()
+	if err != nil {
 		s.providers[providerID] = previous
-		return err
 	}
-	return nil
+	s.mu.Unlock()
+	if err == nil && s.OnChange != nil {
+		s.OnChange(previous, true)
+	}
+	return err
 }
 
 // Providers returns every configured provider, sorted by ID. The provider
@@ -136,13 +158,18 @@ func (s *TOMLStore) Providers() []ProviderConfig {
 }
 
 func (s *TOMLStore) save() error {
-	file := tomlFile{Providers: make(map[string]tomlProvider, len(s.providers))}
+	providers := make(map[string]tomlProvider, len(s.providers))
 	for id, cfg := range s.providers {
-		file.Providers[id] = tomlProvider{DisplayName: cfg.DisplayName, BaseURL: cfg.BaseURL,
+		providers[id] = tomlProvider{DisplayName: cfg.DisplayName, BaseURL: cfg.BaseURL,
 			DefaultModel: cfg.DefaultModel, Enabled: cfg.Enabled}
 	}
 	var buf bytes.Buffer
 	buf.WriteString("# llmctl configuration. No secrets live here: API keys are in secrets.age.\n")
+	file := make(map[string]any, len(s.extra)+1)
+	for key, value := range s.extra {
+		file[key] = value
+	}
+	file["providers"] = providers
 	if err := toml.NewEncoder(&buf).Encode(file); err != nil {
 		return fmt.Errorf("config: encoding: %w", err)
 	}

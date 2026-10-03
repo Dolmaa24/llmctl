@@ -62,7 +62,7 @@ branching. `scripts/check_os_isolation.sh` enforces this in CI.
 | `config.toml` | Provider profiles. No secrets. | `%APPDATA%\llmctl\` |
 | `secrets.age` | API keys, encrypted with `age` | `%APPDATA%\llmctl\` |
 | `secrets.age.index` | Which providers have a key. No secrets. | `%APPDATA%\llmctl\` |
-| `llmctl.db` | Sessions, messages, notes, switch events, extraction runs | `%APPDATA%\llmctl\` |
+| `llmctl.db` | Sessions, messages, notes, switch events, extraction runs, and a mirror of the provider profiles | `%APPDATA%\llmctl\` |
 
 The passphrase for `secrets.age` is created on first use and kept in Windows
 Credential Manager, so there is nothing to type. Inside WSL the files live

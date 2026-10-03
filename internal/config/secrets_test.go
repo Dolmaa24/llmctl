@@ -218,7 +218,7 @@ func TestNoKeyringFallsBackToATypedPassphrase(t *testing.T) {
 	keyring.MockInit()
 	t.Setenv("LLMCTL_NO_KEYRING", "1")
 
-	typed := TypedPassphrase(func() (string, error) { return "typed by hand", nil })
+	typed := NewTypedPassphrase(func() (string, error) { return "typed by hand", nil })
 	source := KeyringPassphrase{Fallback: typed}
 	got, err := source.Passphrase()
 	if err != nil || got != "typed by hand" {
@@ -233,7 +233,7 @@ func TestNoKeyringFallsBackToATypedPassphrase(t *testing.T) {
 	if _, err := (KeyringPassphrase{}).Passphrase(); err == nil {
 		t.Error("no keyring and no fallback returned a passphrase")
 	}
-	empty := TypedPassphrase(func() (string, error) { return "", nil })
+	empty := NewTypedPassphrase(func() (string, error) { return "", nil })
 	if _, err := empty.Passphrase(); !errors.Is(err, ErrInvalid) {
 		t.Errorf("empty typed passphrase: got %v, want ErrInvalid", err)
 	}
@@ -245,5 +245,84 @@ func TestNoKeyringFallsBackToATypedPassphrase(t *testing.T) {
 	}
 	if got, err := s.GetAPIKey("anthropic"); err != nil || got != fakeKey {
 		t.Errorf("Get = %q, %v", got, err)
+	}
+}
+
+func TestTypedPassphraseIsAskedForOncePerProcess(t *testing.T) {
+	keyring.MockInit()
+	t.Setenv("LLMCTL_NO_KEYRING", "1")
+
+	prompts, fail := 0, true
+	typed := NewTypedPassphrase(func() (string, error) {
+		prompts++
+		if fail {
+			return "", errors.New("prompt cancelled")
+		}
+		return "typed by hand", nil
+	})
+	s, _ := tempStore(t, KeyringPassphrase{Fallback: typed})
+
+	// A cancelled prompt is not remembered: the next call asks again.
+	if err := s.SetAPIKey("anthropic", fakeKey); err == nil {
+		t.Fatal("Set succeeded although the prompt was cancelled")
+	}
+	fail = false
+	if err := s.SetAPIKey("anthropic", fakeKey); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	asked := prompts
+	for i := 0; i < 3; i++ {
+		if _, err := s.GetAPIKey("anthropic"); err != nil {
+			t.Fatalf("Get: %v", err)
+		}
+	}
+	if prompts != asked {
+		t.Errorf("the user was prompted %d more times after the first answer", prompts-asked)
+	}
+	if _, err := (*TypedPassphrase)(NewTypedPassphrase(nil)).Passphrase(); err == nil {
+		t.Error("a missing prompt returned a passphrase")
+	}
+}
+
+// TestNoPlaintextKeyAnywhereOnDisk walks everything the stores wrote and
+// checks that the key appears in none of it (SRS FR-1.2).
+func TestNoPlaintextKeyAnywhereOnDisk(t *testing.T) {
+	dir := t.TempDir()
+	cfg, err := LoadTOML(filepath.Join(dir, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.SetProviderConfig(ProviderConfig{ID: "anthropic", DisplayName: "Anthropic",
+		BaseURL: "https://api.anthropic.com", DefaultModel: "claude-haiku-4-5", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	secrets := NewAgeSecretStore(filepath.Join(dir, "secrets.age"), &countingPass{value: "pw"})
+	if err := secrets.SetAPIKey("anthropic", fakeKey); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := secrets.GetAPIKey("anthropic"); err != nil {
+		t.Fatal(err)
+	}
+
+	files := 0
+	err = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		files++
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), fakeKey) {
+			t.Errorf("%s contains the API key in plaintext", filepath.Base(path))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if files != 3 {
+		t.Errorf("found %d files, want config.toml, secrets.age and secrets.age.index", files)
 	}
 }

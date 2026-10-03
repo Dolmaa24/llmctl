@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/zalando/go-keyring"
 )
@@ -28,25 +29,44 @@ type PassphraseSource interface {
 	Generated() bool
 }
 
-// TypedPassphrase is a passphrase a person entered. cmd/llmctl supplies the
-// function, which prompts without echo; tests supply a constant.
-type TypedPassphrase func() (string, error)
+// TypedPassphrase is a passphrase a person enters. The user is asked once per
+// process: the answer is then kept in memory only, never on disk, so reading
+// several keys does not prompt several times. A prompt that fails or returns
+// nothing is not remembered, and the next call asks again.
+type TypedPassphrase struct {
+	prompt func() (string, error)
 
-func (f TypedPassphrase) Passphrase() (string, error) {
-	if f == nil {
+	mu    sync.Mutex
+	value string
+}
+
+// NewTypedPassphrase wraps a prompt. cmd/llmctl supplies one that reads from
+// the terminal without echo.
+func NewTypedPassphrase(prompt func() (string, error)) *TypedPassphrase {
+	return &TypedPassphrase{prompt: prompt}
+}
+
+func (t *TypedPassphrase) Passphrase() (string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.value != "" {
+		return t.value, nil
+	}
+	if t.prompt == nil {
 		return "", errors.New("config: no passphrase prompt is available")
 	}
-	pass, err := f()
+	pass, err := t.prompt()
 	if err != nil {
 		return "", err
 	}
 	if pass == "" {
 		return "", fmt.Errorf("%w: passphrase is empty", ErrInvalid)
 	}
+	t.value = pass
 	return pass, nil
 }
 
-func (TypedPassphrase) Generated() bool { return false }
+func (*TypedPassphrase) Generated() bool { return false }
 
 // KeyringPassphrase keeps the passphrase in the OS keyring: the keyring holds
 // the passphrase and the age file holds the keys (Technical Architecture

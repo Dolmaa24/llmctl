@@ -192,3 +192,61 @@ func TestDefaultPaths(t *testing.T) {
 		t.Errorf("default Dir = %q, want %q", p.Dir, filepath.Join(base, "llmctl"))
 	}
 }
+
+// Other modules, and users editing by hand, keep settings in the same file.
+// Saving a provider must not drop them.
+func TestSavingAProviderKeepsOtherSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	original := "theme = \"dark\"\n\n[handoff]\nraw_turns = 6\n\n[providers.ollama]\ndisplay_name = \"Ollama\"\ndefault_model = \"llama3.1:8b\"\nenabled = true\n"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := LoadTOML(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetProviderConfig(ProviderConfig{ID: "anthropic", DefaultModel: "claude-haiku-4-5"}); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	text := string(data)
+	for _, want := range []string{`theme = "dark"`, "[handoff]", "raw_turns = 6", "[providers.ollama]", "[providers.anthropic]"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("saved file lost %q:\n%s", want, text)
+		}
+	}
+	again, err := LoadTOML(path)
+	if err != nil || len(again.Providers()) != 2 {
+		t.Errorf("reload after save: %v, %+v", err, again)
+	}
+}
+
+func TestOnChangeFiresOnlyAfterASuccessfulSave(t *testing.T) {
+	s, _ := loadTemp(t)
+	type change struct {
+		id      string
+		deleted bool
+	}
+	var seen []change
+	s.OnChange = func(cfg ProviderConfig, deleted bool) {
+		// The hook may read the store without deadlocking.
+		_ = s.Providers()
+		seen = append(seen, change{cfg.ID, deleted})
+	}
+	if err := s.SetProviderConfig(ollama); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetProviderConfig(ProviderConfig{ID: "Bad ID"}); err == nil {
+		t.Fatal("invalid provider accepted")
+	}
+	if err := s.DeleteProvider("missing"); err == nil {
+		t.Fatal("deleting a missing provider succeeded")
+	}
+	if err := s.DeleteProvider("ollama"); err != nil {
+		t.Fatal(err)
+	}
+	want := []change{{"ollama", false}, {"ollama", true}}
+	if len(seen) != 2 || seen[0] != want[0] || seen[1] != want[1] {
+		t.Errorf("OnChange calls = %+v, want %+v", seen, want)
+	}
+}

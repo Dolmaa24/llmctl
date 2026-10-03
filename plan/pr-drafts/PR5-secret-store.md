@@ -50,7 +50,8 @@ Also written into §9 as contract notes, because callers already depend on them:
   first use and kept in the OS keyring (Windows Credential Manager) through
   `go-keyring`, which is pure Go. The user is never prompted.
 - `LLMCTL_NO_KEYRING`: when set, a typed passphrase is used instead. This is
-  the supported path inside WSL, where no keyring service usually runs.
+  the supported path inside WSL, where no keyring service usually runs. The
+  user is asked once per process and the answer is kept in memory only.
 - `HasAPIKey` reads `secrets.age.index`, a plain list of provider IDs kept
   beside the encrypted file. It holds no secret. If it is lost or damaged it
   is rebuilt from the encrypted file.
@@ -78,6 +79,9 @@ passphrase keeps the default.
 - [x] References the requirements it addresses
 - [x] Contract document updated in this PR
 - [x] `internal/mock` updated
-- [ ] Raised in the team channel before merge (contract §11)
+- [ ] Raised in `#interface-changes` and acknowledged before the PR is opened
+      (contract §11, Team Setup Guide §5)
+- [ ] PR carries the `integration`, `config` and `storage` labels and
+      references its issue
 - [ ] CI green
 - [ ] Acknowledged by Person 3, Person 2, Person 1
