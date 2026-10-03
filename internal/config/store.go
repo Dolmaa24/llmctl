@@ -25,4 +25,10 @@ type Store interface {
 type SecretStore interface {
 	GetAPIKey(providerID string) (string, error)
 	SetAPIKey(providerID, apiKey string) error
+
+	// HasAPIKey reports whether a key is stored for the provider, without
+	// decrypting it. Callers that only need to know a key exists (the
+	// provider form, the provider list) must use this rather than GetAPIKey,
+	// so no key is brought into memory just to be discarded.
+	HasAPIKey(providerID string) (bool, error)
 }

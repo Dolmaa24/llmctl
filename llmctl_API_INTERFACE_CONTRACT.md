@@ -304,11 +304,19 @@ type SecretStore interface {
     // GetAPIKey returns the decrypted API key for a provider, decrypting on demand.
     GetAPIKey(providerID string) (string, error)
     SetAPIKey(providerID, apiKey string) error
+
+    // HasAPIKey reports whether a key is stored for a provider, without decrypting it.
+    HasAPIKey(providerID string) (bool, error)
 }
 ```
 
 **Owner:** Person 5
-**Consumed by:** `provider/*` adapters (via `GetAPIKey`), `app` init (loads config on startup)
+**Consumed by:** `provider/*` adapters (via `GetAPIKey`), `app` init (loads config on startup), `app` provider form and provider list (via `HasAPIKey`)
+
+**Contract notes:**
+- `GetAPIKey` returns an error matching `config.ErrNoSecret` when no key is stored. For Ollama, which needs no key, that is the normal case and not a failure.
+- `GetProviderConfig` returns an error matching `config.ErrNotConfigured` for an unknown provider.
+- A caller that only needs to know whether a key exists must call `HasAPIKey`, so a decrypted key is never brought into memory just to be discarded (SRS NFR-4).
 
 ---
 
