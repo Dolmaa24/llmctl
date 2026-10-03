@@ -80,13 +80,25 @@ func (m *Model) openProviderForm(preselect string) {
 	m.form.Open(m.deps.Kinds, saved, preselect)
 }
 
+// keyChecker is the presence check P5 adds to config.SecretStore on
+// feature/sanket-storage (plan/pr-drafts/PR5-secret-store.md).
+type keyChecker interface {
+	HasAPIKey(providerID string) (bool, error)
+}
+
 // hasKey reports whether a key is saved for id.
 //
-// CONTRACT GAP: config.SecretStore offers no presence check, so this decrypts
-// the key only to learn that it exists, then discards it. SRS NFR-4 asks that
-// decrypted keys exist only for as long as they are needed; a HasAPIKey method
-// on SecretStore (P5) would let this avoid decrypting at all.
+// It asks the store's HasAPIKey, so no key is decrypted just to learn that it
+// exists (SRS NFR-4). Until P5's interface change reaches main,
+// config.SecretStore does not declare that method, so it is reached through
+// keyChecker, and a store without it falls back to decrypting and discarding
+// the key. Once SecretStore declares HasAPIKey, call it directly and delete
+// the fallback.
 func (m Model) hasKey(id string) bool {
+	if kc, ok := m.deps.Secrets.(keyChecker); ok {
+		has, err := kc.HasAPIKey(id)
+		return err == nil && has
+	}
 	k, err := m.deps.Secrets.GetAPIKey(id)
 	return err == nil && k != ""
 }

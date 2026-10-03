@@ -255,6 +255,14 @@ func (s *memSecrets) SetAPIKey(id, key string) error {
 	return nil
 }
 
+// HasAPIKey reports whether a key is saved for id without returning it, as
+// the real store does from its index.
+func (s *memSecrets) HasAPIKey(id string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.keys[id] != "", nil
+}
+
 // demoPlanNumbers supplies the figures the cost modal shows until
 // costestimate is wired in. The extraction figure is present so the modal is
 // developed against the honest comparison rather than a handoff-only one.

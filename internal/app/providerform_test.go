@@ -368,3 +368,47 @@ func TestFormFitsTheTerminal(t *testing.T) {
 		}
 	}
 }
+
+// spySecrets counts decryptions and offers HasAPIKey, as the real store
+// does once P5's interface change lands.
+type spySecrets struct {
+	keys map[string]string
+	gets int
+}
+
+func (s *spySecrets) GetAPIKey(id string) (string, error) {
+	s.gets++
+	return s.keys[id], nil
+}
+
+func (s *spySecrets) SetAPIKey(id, key string) error { s.keys[id] = key; return nil }
+
+func (s *spySecrets) HasAPIKey(id string) (bool, error) { return s.keys[id] != "", nil }
+
+var (
+	_ config.SecretStore = (*memSecrets)(nil)
+	_ keyChecker         = (*memSecrets)(nil)
+)
+
+// Learning that a key exists must not decrypt it when the store can say so
+// itself (SRS NFR-4).
+func TestHasKeyDoesNotDecryptWhenTheStoreCanCheck(t *testing.T) {
+	spy := &spySecrets{keys: map[string]string{"anthropic": "sk-ant-x"}}
+	m := Model{deps: Deps{Secrets: spy}}
+
+	if !m.hasKey("anthropic") || m.hasKey("openrouter") {
+		t.Error("presence reported wrongly")
+	}
+	if spy.gets != 0 {
+		t.Errorf("decrypted %d keys to check presence", spy.gets)
+	}
+}
+
+func TestDemoSecretsReportPresence(t *testing.T) {
+	s := &memSecrets{keys: map[string]string{"anthropic": "sk-ant-x", "blank": ""}}
+	for id, want := range map[string]bool{"anthropic": true, "blank": false, "ollama": false} {
+		if got, err := s.HasAPIKey(id); err != nil || got != want {
+			t.Errorf("HasAPIKey(%q) = %v, %v; want %v", id, got, err, want)
+		}
+	}
+}
