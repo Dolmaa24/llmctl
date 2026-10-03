@@ -3,10 +3,12 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/Dolmaa24/llmctl/internal/mock"
+	"github.com/Dolmaa24/llmctl/internal/provider"
 	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
@@ -236,6 +238,49 @@ func TestProviderErrorShowsNoticeAndKeepsRunning(t *testing.T) {
 	}
 	if h.model().inFlight {
 		t.Error("request still marked in flight after failing")
+	}
+}
+
+// A conversation too long for the model gets a notice that names the model
+// and says what to do, not the bare sentinel text. The window size is shown
+// when the adapter supplies it, and the program carries on either way.
+func TestContextTooLargeNamesTheModelAndTheWayOut(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		detail string // expected in the notice; empty when the adapter gave none
+	}{
+		{"bare sentinel", provider.ErrContextTooLarge, ""},
+		{"with the window size", fmt.Errorf("%w: needs 9214 of 8192 tokens", provider.ErrContextTooLarge), "(needs 9214 of 8192 tokens)"},
+		{"wrapped by the adapter", fmt.Errorf("ollama: %w", provider.ErrContextTooLarge), ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t, 120, 32, withAdapters(&mock.Adapter{NameValue: "ollama", SendErr: c.err}))
+			before := len(h.model().messages)
+
+			h.typeText("hello")
+			h.press("enter")
+
+			n := h.model().transcript.Notice()
+			for _, want := range []string{"ollama llama3.1:8b", "too long for this model's context window", "press s to switch"} {
+				if !strings.Contains(n, want) {
+					t.Errorf("notice = %q, want it to contain %q", n, want)
+				}
+			}
+			if strings.Contains(n, provider.ErrContextTooLarge.Error()) {
+				t.Errorf("notice repeats the sentinel text: %q", n)
+			}
+			if c.detail != "" && !strings.Contains(n, c.detail) {
+				t.Errorf("notice = %q, want the adapter's detail %q", n, c.detail)
+			}
+			if got := len(h.model().messages); got != before+1 {
+				t.Errorf("got %d messages, want %d: a refused request must not add a reply", got, before+1)
+			}
+			if h.model().inFlight {
+				t.Error("request still marked in flight after the refusal")
+			}
+		})
 	}
 }
 

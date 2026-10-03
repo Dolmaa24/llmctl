@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Dolmaa24/llmctl/internal/provider"
@@ -99,9 +100,12 @@ func (m Model) receive(r replyMsg) (tea.Model, tea.Cmd) {
 	m.finishRequest()
 
 	if r.err != nil {
-		if errors.Is(r.err, context.Canceled) {
+		switch {
+		case errors.Is(r.err, context.Canceled):
 			m.transcript.SetNotice("request cancelled")
-		} else {
+		case errors.Is(r.err, provider.ErrContextTooLarge):
+			m.transcript.SetNotice(contextTooLargeNotice(r.provider, r.model, r.err))
+		default:
 			m.transcript.SetNotice(fmt.Sprintf("%s: %v", r.provider, r.err))
 		}
 		return m, nil
@@ -130,6 +134,23 @@ func (m Model) receive(r replyMsg) (tea.Model, tea.Cmd) {
 	m.messages = append(m.messages, reply)
 	m.transcript.SetMessages(m.messages)
 	return m, nil
+}
+
+// contextTooLargeNotice explains provider.ErrContextTooLarge in terms the user
+// can act on: which model refused, and that a model with a larger window will
+// take the conversation. Local models hit this far sooner than hosted ones.
+//
+// The contract gives the error no fields, so the window size appears only
+// when the adapter wraps the sentinel with it, for example
+// fmt.Errorf("%w: needs 9214 of 8192 tokens", provider.ErrContextTooLarge).
+// Whatever the adapter put after the sentinel is shown as given.
+func contextTooLargeNotice(providerID, model string, err error) string {
+	detail := ""
+	if _, after, ok := strings.Cut(err.Error(), provider.ErrContextTooLarge.Error()+": "); ok && after != "" {
+		detail = " (" + after + ")"
+	}
+	return fmt.Sprintf("%s %s: the conversation is too long for this model's context window%s. "+
+		"Press tab, choose a model with a larger window, and press s to switch.", providerID, model, detail)
 }
 
 // cancelRequest abandons the in-flight request immediately.
