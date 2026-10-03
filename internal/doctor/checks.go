@@ -43,3 +43,28 @@ type Runner interface {
 	Register(c Check)
 	RunAll(ctx context.Context) []CheckResult
 }
+
+// DefaultRunner is the standard in-memory implementation of Runner.
+type DefaultRunner struct {
+	checks []Check
+}
+
+// NewRunner creates an empty DefaultRunner ready for registering checks.
+func NewRunner() *DefaultRunner {
+	return &DefaultRunner{checks: make([]Check, 0)}
+}
+
+func (r *DefaultRunner) Register(c Check) {
+	if c == nil {
+		return
+	}
+	r.checks = append(r.checks, c)
+}
+
+func (r *DefaultRunner) RunAll(ctx context.Context) []CheckResult {
+	results := make([]CheckResult, 0, len(r.checks))
+	for _, c := range r.checks {
+		results = append(results, c.Run(ctx))
+	}
+	return results
+}
