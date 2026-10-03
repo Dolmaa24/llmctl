@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Dolmaa24/llmctl/internal/session"
@@ -148,4 +149,63 @@ func nullable(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// ExportMarkdown renders a snapshot as a readable transcript followed by the
+// notes (SRS FR-5.3). Each assistant turn is attributed to its provider and
+// model, and each switch appears as a divider where it happened, as in the
+// TUI transcript. Unlike the JSON export this is for people, and its layout
+// is not a contract.
+func ExportMarkdown(snap Snapshot, exportedAt time.Time) []byte {
+	var b strings.Builder
+	title := snap.Session.Title
+	if title == "" {
+		title = "Untitled session"
+	}
+	fmt.Fprintf(&b, "# %s\n\n", title)
+	fmt.Fprintf(&b, "- Session: `%s`\n- Exported: %s\n\n", snap.Session.ID, rfc3339(exportedAt))
+
+	b.WriteString("## Transcript\n\n")
+	if len(snap.Messages) == 0 {
+		b.WriteString("_No messages._\n\n")
+	}
+	next := 0
+	divider := func(e session.SwitchEvent) {
+		fmt.Fprintf(&b, "---\n\n*Switched to **%s/%s**: distilled handoff about %d tokens, full replay about %d*\n\n---\n\n",
+			e.ToProvider, e.ToModel, e.EstimatedTokensDistilled, e.EstimatedTokensFullReplay)
+	}
+	for _, m := range snap.Messages {
+		for next < len(snap.SwitchEvents) && !snap.SwitchEvents[next].CreatedAt.After(m.CreatedAt) {
+			divider(snap.SwitchEvents[next])
+			next++
+		}
+		who := "**You**"
+		switch m.Role {
+		case session.RoleAssistant:
+			who = fmt.Sprintf("**%s/%s**", m.Provider, m.Model)
+		case session.RoleSystem:
+			who = "**System**"
+		}
+		fmt.Fprintf(&b, "%s · %s\n\n%s\n\n", who, rfc3339(m.CreatedAt), m.Content)
+	}
+	// A switch after the last message still happened and is still shown.
+	for ; next < len(snap.SwitchEvents); next++ {
+		divider(snap.SwitchEvents[next])
+	}
+
+	b.WriteString("## Notes\n\n")
+	if len(snap.Notes) == 0 {
+		b.WriteString("_No notes extracted._\n")
+	}
+	for _, n := range snap.Notes {
+		line := fmt.Sprintf("%s (*%s/%s*)", n.Content, n.Provider, n.Model)
+		for _, tag := range n.Tags {
+			line += " `#" + tag + "`"
+		}
+		if n.SupersededBy != nil {
+			line = "~~" + line + "~~ (superseded)"
+		}
+		b.WriteString("- " + line + "\n")
+	}
+	return []byte(b.String())
 }

@@ -100,3 +100,30 @@ func (d *dbTime) parse(s string) error {
 	}
 	return fmt.Errorf("storage: unrecognised timestamp %q", s)
 }
+
+func mustAffect(res sql.Result, kind, id string) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("storage: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("%w: %s %q", ErrNotFound, kind, id)
+	}
+	return nil
+}
+
+// The schema keeps provider, model and token_count null for user messages
+// and for counts not yet estimated.
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func nullIfZero(n int) any {
+	if n == 0 {
+		return nil
+	}
+	return n
+}
