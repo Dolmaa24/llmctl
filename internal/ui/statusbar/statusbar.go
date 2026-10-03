@@ -47,6 +47,20 @@ func (m *Model) SetCheck(name, status, message string) {
 	}
 }
 
+// RemoveCheck drops a check whose subject no longer exists: the auth check of
+// a provider the user has removed would otherwise go on reporting on a
+// provider that is gone. Which checks run is still the diagnostics module's
+// decision; this only stops the bar showing one that cannot apply.
+func (m *Model) RemoveCheck(name string) {
+	kept := m.checks[:0:0]
+	for _, c := range m.checks {
+		if c.Name != name {
+			kept = append(kept, c)
+		}
+	}
+	m.checks = kept
+}
+
 func (m *Model) SetWidth(w int) { m.width = w }
 
 func (m Model) Init() tea.Cmd { return nil }

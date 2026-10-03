@@ -61,6 +61,7 @@ func (m *Model) layout() tea.Cmd {
 	m.status.SetWidth(m.width)
 	m.confirm.SetSize(m.width, m.height)
 	m.form.SetSize(m.width, m.height)
+	m.remove.SetSize(m.width, m.height)
 
 	if !m.visible(m.focus) {
 		return m.setFocus(paneComposer)
@@ -82,6 +83,9 @@ func (m Model) View() string {
 	}
 	if m.confirm.Visible() {
 		return m.confirm.View()
+	}
+	if m.remove.Visible() {
+		return m.remove.View()
 	}
 
 	middle := lipgloss.JoinVertical(lipgloss.Left, m.transcript.View(), m.composer.View())
@@ -111,7 +115,7 @@ func (m Model) help() string {
 		// screen by default, so advertising it would send users the wrong way.
 		pairs = [][2]string{{"enter", "send"}, {"ctrl+j", "newline"}, {"tab", "pane"}, {"ctrl+c", "quit"}}
 	case m.focus == paneProviders:
-		pairs = [][2]string{{"↑↓", "move"}, {"s", "switch"}, {"a", "add"}, {"e", "edit"}, {"tab", "pane"}, {"q", "quit"}}
+		pairs = [][2]string{{"↑↓", "move"}, {"s", "switch"}, {"a", "add"}, {"e", "edit"}, {"r", "remove"}, {"tab", "pane"}, {"q", "quit"}}
 	case m.focus == paneNotes:
 		pairs = [][2]string{{"↑↓", "scroll"}, {"t", "filter"}, {"tab", "pane"}, {"q", "quit"}}
 	default:

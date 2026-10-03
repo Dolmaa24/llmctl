@@ -42,8 +42,10 @@ type Model struct {
 
 	// notice is a transient line such as a provider error. It is shown in the
 	// transcript but is not a message: it must never be sent to a model as
-	// part of the conversation history.
-	notice string
+	// part of the conversation history. noticeOK marks it as a success, such
+	// as a finished export, rather than a problem.
+	notice   string
+	noticeOK bool
 
 	focused bool
 	width   int
@@ -103,9 +105,16 @@ func (m *Model) ClearPending() {
 	}
 }
 
-// SetNotice shows a transient line at the foot of the transcript.
-func (m *Model) SetNotice(s string) {
-	m.notice = s
+// SetNotice shows a transient line at the foot of the transcript, styled as a
+// problem.
+func (m *Model) SetNotice(s string) { m.showNotice(s, false) }
+
+// SetSuccess shows a transient line reporting that something worked. It must
+// not look like an error, or the user will doubt an export that succeeded.
+func (m *Model) SetSuccess(s string) { m.showNotice(s, true) }
+
+func (m *Model) showNotice(s string, ok bool) {
+	m.notice, m.noticeOK = s, ok
 	if m.ready {
 		m.refresh()
 		m.vp.GotoBottom()
@@ -222,10 +231,15 @@ func (m Model) tail() string {
 		return b.String()
 
 	case m.notice != "":
+		// The symbol marks success or failure by shape as well as colour.
+		colour, symbol := styles.Fail, "! "
+		if m.noticeOK {
+			colour, symbol = styles.OK, "✓ "
+		}
 		return "\n\n" + lipgloss.NewStyle().
 			Width(styles.Inner(m.width)).
-			Foreground(styles.Fail).
-			Render("! "+m.notice)
+			Foreground(colour).
+			Render(symbol+m.notice)
 	}
 	return ""
 }

@@ -79,7 +79,11 @@ func TestEscapeClosesModal(t *testing.T) {
 func TestFrameIsExactlyTerminalHeight(t *testing.T) {
 	for _, size := range sizes {
 		w, h := size[0], size[1]
-		for _, keys := range [][]string{nil, {"tab"}, {"tab", "tab"}, append(toProviders, "s")} {
+		overlays := [][]string{
+			append(toProviders, "s"),         // switch confirmation
+			append(toProviders, "down", "r"), // removal confirmation
+		}
+		for _, keys := range append([][]string{nil, {"tab"}, {"tab", "tab"}}, overlays...) {
 			out := render(t, w, h, keys...)
 			if got := len(strings.Split(out, "\n")); got != h {
 				t.Errorf("at %dx%d after %v: frame is %d rows, want %d", w, h, keys, got, h)

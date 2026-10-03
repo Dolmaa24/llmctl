@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/Dolmaa24/llmctl/internal/ui/composer"
+	"github.com/Dolmaa24/llmctl/internal/ui/confirm"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerform"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerpane"
 	"github.com/Dolmaa24/llmctl/internal/ui/switchconfirm"
@@ -60,6 +61,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case switchconfirm.CancelledMsg:
 		m.switchTarget = ""
 		return m, nil
+
+	case confirm.ConfirmedMsg:
+		m.removeProvider()
+		return m, nil
+
+	case confirm.CancelledMsg:
+		m.removeTarget = ""
+		return m, nil
 	}
 	return m, nil
 }
@@ -81,6 +90,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.confirm.Visible() {
 		var cmd tea.Cmd
 		m.confirm, cmd = m.confirm.Update(msg)
+		return m, cmd
+	}
+	if m.remove.Visible() {
+		var cmd tea.Cmd
+		m.remove, cmd = m.remove.Update(msg)
 		return m, cmd
 	}
 
@@ -120,6 +134,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, Keys.Edit) && m.focus == paneProviders:
 		if item, ok := m.providers.Selected(); ok {
 			m.openProviderForm(item.ID)
+		}
+		return m, nil
+	case key.Matches(msg, Keys.Remove) && m.focus == paneProviders:
+		if item, ok := m.providers.Selected(); ok {
+			m.askRemove(item)
 		}
 		return m, nil
 	}

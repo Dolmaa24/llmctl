@@ -18,8 +18,9 @@ type KeyMap struct {
 	Switch key.Binding
 
 	// In the provider list only.
-	Add  key.Binding
-	Edit key.Binding
+	Add    key.Binding
+	Edit   key.Binding
+	Remove key.Binding
 }
 
 var Keys = KeyMap{
@@ -31,4 +32,5 @@ var Keys = KeyMap{
 	Switch:    key.NewBinding(key.WithKeys("s")),
 	Add:       key.NewBinding(key.WithKeys("a")),
 	Edit:      key.NewBinding(key.WithKeys("e")),
+	Remove:    key.NewBinding(key.WithKeys("r")),
 }

@@ -230,6 +230,18 @@ func (s *memConfigs) SetProviderConfig(c config.ProviderConfig) error {
 	return nil
 }
 
+// DeleteProvider removes a provider's configuration, failing for one that is
+// not configured, as the storage module's TOMLStore does.
+func (s *memConfigs) DeleteProvider(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.rows[id]; !ok {
+		return fmt.Errorf("provider %q is not configured", id)
+	}
+	delete(s.rows, id)
+	return nil
+}
+
 // memSecrets is an in-memory config.SecretStore for the demo. Unlike the real
 // store it does not encrypt, which is acceptable only because every key it
 // holds is fake and nothing is written to disk.
@@ -261,6 +273,15 @@ func (s *memSecrets) HasAPIKey(id string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.keys[id] != "", nil
+}
+
+// DeleteAPIKey removes a provider's key. Removing a key that was never saved
+// is not an error, as in the storage module's AgeSecretStore.
+func (s *memSecrets) DeleteAPIKey(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.keys, id)
+	return nil
 }
 
 // demoPlanNumbers supplies the figures the cost modal shows until

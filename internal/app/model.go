@@ -9,6 +9,7 @@ import (
 	"github.com/Dolmaa24/llmctl/internal/provider"
 	"github.com/Dolmaa24/llmctl/internal/session"
 	"github.com/Dolmaa24/llmctl/internal/ui/composer"
+	"github.com/Dolmaa24/llmctl/internal/ui/confirm"
 	"github.com/Dolmaa24/llmctl/internal/ui/notespane"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerform"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerpane"
@@ -63,6 +64,7 @@ type Model struct {
 	status     statusbar.Model
 	confirm    switchconfirm.Model
 	form       providerform.Model
+	remove     confirm.Model
 
 	deps Deps
 
@@ -87,6 +89,9 @@ type Model struct {
 	// The provider the open switch modal would switch to.
 	switchTarget string
 
+	// The provider the open removal confirmation would remove.
+	removeTarget string
+
 	focus  pane
 	width  int
 	height int
@@ -108,6 +113,7 @@ func New(d Deps, s State) Model {
 		status:     statusbar.New(s.Checks),
 		confirm:    switchconfirm.New(),
 		form:       providerform.New(),
+		remove:     confirm.New(),
 		deps:       d,
 		messages:   s.Messages,
 		sessionID:  "local",
