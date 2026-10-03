@@ -185,6 +185,8 @@ func keyMsg(k string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEnter}
 	case "alt+enter":
 		return tea.KeyMsg{Type: tea.KeyEnter, Alt: true}
+	case "ctrl+j":
+		return tea.KeyMsg{Type: tea.KeyCtrlJ}
 	case "esc":
 		return tea.KeyMsg{Type: tea.KeyEsc}
 	case "ctrl+c":

@@ -1,7 +1,9 @@
 // Package composer is where the user writes a message.
 //
-// Enter sends and Alt+Enter inserts a newline, because most messages to a
-// model are one line and should not need a modifier to send. Pasted text keeps
+// Enter sends and Ctrl+J inserts a newline, because most messages to a model
+// are one line and should not need a modifier to send. Alt+Enter inserts a
+// newline too, but Windows Terminal takes it for full screen by default, so
+// Ctrl+J is the key the help bar shows. Pasted text keeps
 // its newlines regardless: Bubble Tea delivers a bracketed paste as a single
 // message rather than as a series of Enter presses, so a pasted stack trace
 // arrives whole instead of being sent line by line.
@@ -50,7 +52,7 @@ func New() Model {
 
 	// Enter is bound to InsertNewline by default. Left alone, one keypress
 	// would both insert a newline and submit.
-	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))
+	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("ctrl+j", "alt+enter"))
 
 	// A blinking cursor re-arms a timer on every blink for as long as the
 	// program runs. Static is calmer and wakes the program only on input.

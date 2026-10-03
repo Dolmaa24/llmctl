@@ -99,17 +99,35 @@ func TestBlankMessageIsNotSent(t *testing.T) {
 	}
 }
 
-func TestAltEnterInsertsNewlineWithoutSending(t *testing.T) {
-	h := newHarness(t, 120, 32)
-	before := len(h.model().messages)
-	h.typeText("first line")
-	h.press("alt+enter")
-	h.typeText("second line")
-	if got := h.model().composer.Value(); got != "first line\nsecond line" {
-		t.Errorf("composer holds %q", got)
+// Ctrl+J is the newline key the help bar shows; Alt+Enter keeps working for
+// terminals that pass it through.
+func TestNewlineKeysInsertNewlineWithoutSending(t *testing.T) {
+	for _, k := range []string{"ctrl+j", "alt+enter"} {
+		t.Run(k, func(t *testing.T) {
+			h := newHarness(t, 120, 32)
+			before := len(h.model().messages)
+			h.typeText("first line")
+			h.press(k)
+			h.typeText("second line")
+			if got := h.model().composer.Value(); got != "first line\nsecond line" {
+				t.Errorf("composer holds %q", got)
+			}
+			if got := len(h.model().messages); got != before {
+				t.Errorf("%s sent the message", k)
+			}
+		})
 	}
-	if got := len(h.model().messages); got != before {
-		t.Error("alt+enter sent the message")
+}
+
+// Windows Terminal takes Alt+Enter for full screen by default, so the help
+// bar must point at Ctrl+J instead.
+func TestHelpBarShowsCtrlJForNewline(t *testing.T) {
+	out := newHarness(t, 120, 32).view()
+	if !strings.Contains(out, "ctrl+j newline") {
+		t.Errorf("help bar does not show ctrl+j for newline:\n%s", out)
+	}
+	if strings.Contains(out, "alt+enter") {
+		t.Errorf("help bar still advertises alt+enter:\n%s", out)
 	}
 }
 

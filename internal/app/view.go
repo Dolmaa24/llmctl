@@ -107,7 +107,9 @@ func (m Model) help() string {
 	case m.focus == paneComposer && m.inFlight:
 		pairs = [][2]string{{"esc", "cancel"}, {"tab", "pane"}, {"ctrl+c", "quit"}}
 	case m.focus == paneComposer:
-		pairs = [][2]string{{"enter", "send"}, {"alt+enter", "newline"}, {"tab", "pane"}, {"ctrl+c", "quit"}}
+		// Ctrl+J, not Alt+Enter: Windows Terminal takes Alt+Enter for full
+		// screen by default, so advertising it would send users the wrong way.
+		pairs = [][2]string{{"enter", "send"}, {"ctrl+j", "newline"}, {"tab", "pane"}, {"ctrl+c", "quit"}}
 	case m.focus == paneProviders:
 		pairs = [][2]string{{"↑↓", "move"}, {"s", "switch"}, {"a", "add"}, {"e", "edit"}, {"tab", "pane"}, {"q", "quit"}}
 	case m.focus == paneNotes:
