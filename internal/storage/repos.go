@@ -6,7 +6,7 @@ package storage
 import (
 	"context"
 
-	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/DhairyaP4/llmctl/internal/session"
 )
 
 type SessionsRepo interface {
@@ -30,4 +30,9 @@ type NotesRepo interface {
 type SwitchEventsRepo interface {
 	Create(ctx context.Context, e *session.SwitchEvent) error
 	ListBySession(ctx context.Context, sessionID string) ([]session.SwitchEvent, error)
+}
+
+type ExtractionRunsRepo interface {
+	Create(ctx context.Context, r *session.ExtractionRun) error
+	ListBySession(ctx context.Context, sessionID string) ([]session.ExtractionRun, error)
 }

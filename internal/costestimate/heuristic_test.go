@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dolmaa24/llmctl/internal/costestimate"
-	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/DhairyaP4/llmctl/internal/costestimate"
+	"github.com/DhairyaP4/llmctl/internal/session"
 )
 
 var h costestimate.Heuristic

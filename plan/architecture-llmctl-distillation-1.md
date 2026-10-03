@@ -3,7 +3,7 @@ goal: Implement llmctl and produce a publication-grade empirical evaluation of d
 version: 1.0
 date_created: 2026-09-24
 last_updated: 2026-09-24
-owner: Team No. 260 — Ayush Kushwah (P5/lead), Dolmaa Sharma (P3), Dhairya Dani, Sanket Subhralok Mohapatra, Nivedya B; Supervisor Dr. Vandana Shakya
+owner: Team No. 260 — Ayush Kushwah (P5/lead), Dhairya P4 (P3), Dhairya Dani, Sanket Subhralok Mohapatra, Nivedya B; Supervisor Dr. Vandana Shakya
 status: 'Planned'
 tags: [architecture, feature, research, evaluation, capstone-phase-2]
 ---

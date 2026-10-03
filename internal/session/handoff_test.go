@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dolmaa24/llmctl/internal/costestimate"
-	"github.com/Dolmaa24/llmctl/internal/mock"
-	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/DhairyaP4/llmctl/internal/costestimate"
+	"github.com/DhairyaP4/llmctl/internal/mock"
+	"github.com/DhairyaP4/llmctl/internal/session"
 )
 
 var t0 = time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)

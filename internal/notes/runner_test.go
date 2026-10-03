@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dolmaa24/llmctl/internal/mock"
-	"github.com/Dolmaa24/llmctl/internal/notes"
-	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/DhairyaP4/llmctl/internal/mock"
+	"github.com/DhairyaP4/llmctl/internal/notes"
+	"github.com/DhairyaP4/llmctl/internal/session"
 )
 
 var bg = context.Background()
@@ -35,7 +35,7 @@ func newRig(t *testing.T) *rig {
 		t:      t,
 		msgs:   mock.NewMessagesRepo(),
 		notes:  mock.NewNotesRepo(),
-		ledger: mock.NewLedger(),
+		ledger: mock.NewExtractionRunsRepo(),
 		models: map[string]notes.Sender{"anthropic": &fakeModel{reply: `{"notes": []}`}},
 		sess:   &session.Session{ID: "s1", ActiveProvider: "anthropic", ActiveModel: opus},
 	}
@@ -70,7 +70,7 @@ func (r *rig) exchange(provider, model, question, answer string) {
 
 func (r *rig) model(provider string) *fakeModel { return r.models[provider].(*fakeModel) }
 
-func (r *rig) runs() []notes.Run {
+func (r *rig) runs() []session.ExtractionRun {
 	runs, _ := r.ledger.ListBySession(bg, r.sess.ID)
 	return runs
 }
@@ -98,7 +98,7 @@ func TestContinuousTakesNotesAfterEachReply(t *testing.T) {
 		t.Fatalf("stored %+v, returned %+v; want the one note, stored", stored, res.Notes)
 	}
 	runs := rg.runs()
-	if len(runs) != 1 || runs[0].Through != 1 || runs[0].Err != "" || runs[0].Usage.Model != haiku ||
+	if len(runs) != 1 || runs[0].ThroughSequenceNum != 1 || runs[0].Err != "" || runs[0].Model != haiku ||
 		!slices.Equal(runs[0].NoteIDs, []string{stored[0].ID}) {
 		t.Errorf("runs = %+v, want one completed run through message 1 that produced the note", runs)
 	}
@@ -179,7 +179,7 @@ func TestAFailedPassIsChargedAndReadAgain(t *testing.T) {
 		t.Fatal("want the unreadable reply reported")
 	}
 	runs := rg.runs()
-	if len(runs) != 1 || runs[0].Err == "" || runs[0].Usage.InputTokens == 0 {
+	if len(runs) != 1 || runs[0].Err == "" || runs[0].InputTokens == 0 {
 		t.Fatalf("runs = %+v, want one failed run, charged", runs)
 	}
 
@@ -216,7 +216,7 @@ func TestAReplacementIsStoredBeforeItIsReferenced(t *testing.T) {
 	if len(res.Notes) != 1 || got.SupersededBy == nil || *got.SupersededBy != res.Notes[0].ID {
 		t.Errorf("old note superseded by %v, want %+v", got.SupersededBy, res.Notes)
 	}
-	if runs := rg.runs(); len(runs) != 1 || runs[0].Superseded != 1 {
+	if runs := rg.runs(); len(runs) != 1 {
 		t.Errorf("runs = %+v, want one that overturned one note", runs)
 	}
 }
@@ -245,7 +245,7 @@ func TestProvidersAreNeverMixedInAPass(t *testing.T) {
 	if hosted.model != haiku || local.model != "qwen2.5-coder:3b" {
 		t.Errorf("models: hosted %q, local %q", hosted.model, local.model)
 	}
-	if runs := rg.runs(); len(runs) != 2 || runs[0].Through != 1 || runs[1].Through != 3 {
+	if runs := rg.runs(); len(runs) != 2 || runs[0].ThroughSequenceNum != 1 || runs[1].ThroughSequenceNum != 3 {
 		t.Errorf("runs = %+v, want one per provider, in order", runs)
 	}
 }
@@ -284,7 +284,7 @@ func TestUnorderedStorageIsReadInOrder(t *testing.T) {
 	if _, err := rg.runner(notes.Continuous).AfterReply(bg, rg.sess); err != nil {
 		t.Fatal(err)
 	}
-	if runs := rg.runs(); len(runs) != 1 || runs[0].Through != 1 {
+	if runs := rg.runs(); len(runs) != 1 || runs[0].ThroughSequenceNum != 1 {
 		t.Errorf("runs = %+v, want the pass to end on the last message", runs)
 	}
 	if p := rg.model("anthropic").prompts[0]; strings.Index(p, "a question") > strings.Index(p, "an answer") {
@@ -409,34 +409,34 @@ func TestSpentIncludesFailedPasses(t *testing.T) {
 		t.Fatalf("runs = %+v, want a failed run then a completed one", runs)
 	}
 	in, out, err := r.Spent(bg, rg.sess.ID)
-	wantIn := runs[0].Usage.InputTokens + runs[1].Usage.InputTokens
-	wantOut := runs[0].Usage.OutputTokens + runs[1].Usage.OutputTokens
-	if err != nil || in != wantIn || out != wantOut || runs[0].Usage.InputTokens == 0 {
+	wantIn := runs[0].InputTokens + runs[1].InputTokens
+	wantOut := runs[0].OutputTokens + runs[1].OutputTokens
+	if err != nil || in != wantIn || out != wantOut || runs[0].InputTokens == 0 {
 		t.Errorf("Spent = %d in / %d out, %v; want %d / %d, the failed pass included", in, out, err, wantIn, wantOut)
 	}
 }
 
 // strictLedger refuses to write under a cancelled context, as a real
 // database driver does.
-type strictLedger struct{ *mock.Ledger }
+type strictLedger struct{ *mock.ExtractionRunsRepo }
 
-func (l strictLedger) Create(ctx context.Context, r *notes.Run) error {
+func (l strictLedger) Create(ctx context.Context, r *session.ExtractionRun) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return l.Ledger.Create(ctx, r)
+	return l.ExtractionRunsRepo.Create(ctx, r)
 }
 
 func TestACancelledPassIsStillRecorded(t *testing.T) {
 	rg := newRig(t)
-	rg.ledger = strictLedger{mock.NewLedger()}
+	rg.ledger = strictLedger{mock.NewExtractionRunsRepo()}
 	rg.exchange("anthropic", opus, "a question", "an answer")
 
 	// The user quits just as the reply arrives: the call was paid for.
 	ctx, cancel := context.WithCancel(bg)
 	cancel()
 	_, _ = rg.runner(notes.Continuous).AfterReply(ctx, rg.sess)
-	if runs := rg.runs(); len(runs) != 1 || runs[0].Usage.InputTokens == 0 {
+	if runs := rg.runs(); len(runs) != 1 || runs[0].InputTokens == 0 {
 		t.Errorf("runs = %+v, want the paid-for pass recorded", runs)
 	}
 }

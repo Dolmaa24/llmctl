@@ -3,7 +3,7 @@ package costestimate
 import (
 	"unicode/utf8"
 
-	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/DhairyaP4/llmctl/internal/session"
 )
 
 // Heuristic is the reference Estimator: one token per four characters, plus a

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/DhairyaP4/llmctl/internal/session"
 )
 
 // Schedule is when extraction runs, which is PRD open question #1. It counts
@@ -44,43 +44,20 @@ type NoteStore interface {
 // an interface change for the storage module to approve. Until then
 // mock.Ledger keeps runs in memory, and a restart forgets them, so the first
 // pass after a restart reads the whole transcript again.
+// Ledger is satisfied by storage.ExtractionRunsRepo.
 type Ledger interface {
-	Create(ctx context.Context, r *Run) error
-	ListBySession(ctx context.Context, sessionID string) ([]Run, error)
+	Create(ctx context.Context, r *session.ExtractionRun) error
+	ListBySession(ctx context.Context, sessionID string) ([]session.ExtractionRun, error)
 }
 
 // SenderLookup returns the adapter for a provider. The app wraps the
 // provider registry's Get.
 type SenderLookup func(provider string) (Sender, error)
 
-// Run records one extraction pass.
-type Run struct {
-	SessionID string
-
-	// Through is the SequenceNum of the last message the pass read. The
-	// next pass starts after the furthest Through of any completed run.
-	Through int
-
-	// Usage is what the pass cost. A failed pass is charged too.
-	Usage Usage
-
-	// NoteIDs are the notes the pass stored, which ties each note to the
-	// model and prompt version that produced it. Superseded counts the
-	// existing notes the pass overturned.
-	NoteIDs    []string
-	Superseded int
-
-	// Err is empty for a completed pass. A failed pass moves nothing on:
-	// its turns are read again by the next one.
-	Err string
-
-	At time.Time
-}
-
 // Result is what one call to a Runner did: a run for each pass, in order,
 // and every note stored. Both are empty when there was nothing to read.
 type Result struct {
-	Runs  []Run
+	Runs  []session.ExtractionRun
 	Notes []session.Note
 }
 
@@ -136,8 +113,8 @@ func (r *Runner) Spent(ctx context.Context, sessionID string) (input, output int
 		return 0, 0, fmt.Errorf("notes: loading extraction runs: %w", err)
 	}
 	for _, run := range runs {
-		input += run.Usage.InputTokens
-		output += run.Usage.OutputTokens
+		input += run.InputTokens
+		output += run.OutputTokens
 	}
 	return input, output, nil
 }
@@ -183,7 +160,7 @@ func (r *Runner) catchUp(ctx context.Context, sess *session.Session, minReplies 
 // pass takes notes on one stretch on the cheap model for its provider,
 // stores them, and records the run. It returns no run when it failed before
 // calling the model, since nothing was spent.
-func (r *Runner) pass(ctx context.Context, sessionID string, seg segment) (*Run, []session.Note, error) {
+func (r *Runner) pass(ctx context.Context, sessionID string, seg segment) (*session.ExtractionRun, []session.Note, error) {
 	target := CheapTarget(seg.conversation)
 	sender, err := r.senders(target.Provider)
 	if err != nil {
@@ -196,17 +173,19 @@ func (r *Runner) pass(ctx context.Context, sessionID string, seg segment) (*Run,
 
 	p, err := NewModelExtractor(sender, target.Model, r.counter).ExtractPass(ctx, seg.msgs, existing)
 	var stored []session.Note
-	var superseded int
 	if err == nil {
-		stored, superseded, err = r.store(ctx, p)
+		stored, _, err = r.store(ctx, p)
 	}
 
-	run := &Run{
-		SessionID:  sessionID,
-		Through:    seg.msgs[len(seg.msgs)-1].SequenceNum,
-		Usage:      p.Usage,
-		Superseded: superseded,
-		At:         time.Now(),
+	run := &session.ExtractionRun{
+		SessionID:          sessionID,
+		ThroughSequenceNum: seg.msgs[len(seg.msgs)-1].SequenceNum,
+		Provider:           target.Provider,
+		Model:              target.Model,
+		PromptVersion:      PromptVersion,
+		InputTokens:        p.Usage.InputTokens,
+		OutputTokens:       p.Usage.OutputTokens,
+		CreatedAt:          time.Now(),
 	}
 	for _, n := range stored {
 		run.NoteIDs = append(run.NoteIDs, n.ID)
@@ -247,11 +226,11 @@ func (r *Runner) store(ctx context.Context, p Pass) (stored []session.Note, supe
 
 // unread returns, in conversation order, the messages after the furthest
 // point any completed run has read.
-func unread(msgs []session.Message, runs []Run) []session.Message {
+func unread(msgs []session.Message, runs []session.ExtractionRun) []session.Message {
 	through, read := 0, false
 	for _, run := range runs {
-		if run.Err == "" && (!read || run.Through > through) {
-			through, read = run.Through, true
+		if run.Err == "" && (!read || run.ThroughSequenceNum > through) {
+			through, read = run.ThroughSequenceNum, true
 		}
 	}
 	var out []session.Message

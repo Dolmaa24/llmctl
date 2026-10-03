@@ -3,12 +3,12 @@ package mock
 import (
 	"testing"
 
-	"github.com/Dolmaa24/llmctl/internal/config"
-	"github.com/Dolmaa24/llmctl/internal/doctor"
-	"github.com/Dolmaa24/llmctl/internal/notes"
-	"github.com/Dolmaa24/llmctl/internal/provider"
-	"github.com/Dolmaa24/llmctl/internal/shell"
-	"github.com/Dolmaa24/llmctl/internal/storage"
+	"github.com/DhairyaP4/llmctl/internal/config"
+	"github.com/DhairyaP4/llmctl/internal/doctor"
+	"github.com/DhairyaP4/llmctl/internal/notes"
+	"github.com/DhairyaP4/llmctl/internal/provider"
+	"github.com/DhairyaP4/llmctl/internal/shell"
+	"github.com/DhairyaP4/llmctl/internal/storage"
 )
 
 // TestMocksSatisfyContract fails to compile if any mock drifts from the
@@ -26,7 +26,7 @@ func TestMocksSatisfyContract(t *testing.T) {
 		_ shell.Launcher           = (*Launcher)(nil)
 		_ doctor.Check             = (*Check)(nil)
 		_ notes.Extractor          = (*Extractor)(nil)
-		_ notes.Ledger             = (*Ledger)(nil)
+		_ storage.ExtractionRunsRepo             = (*ExtractionRunsRepo)(nil)
 		_ config.Store             = (*ConfigStore)(nil)
 		_ config.SecretStore       = (*SecretStore)(nil)
 	)

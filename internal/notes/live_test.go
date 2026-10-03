@@ -29,8 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dolmaa24/llmctl/internal/costestimate"
-	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/DhairyaP4/llmctl/internal/costestimate"
+	"github.com/DhairyaP4/llmctl/internal/session"
 )
 
 // liveSender is a Sender that also keeps the raw reply, and the provider's
@@ -133,7 +133,7 @@ func (a *anthropic) SendMessage(ctx context.Context, model string, history []ses
 	for _, c := range out.Content {
 		a.reply += c.Text
 	}
-	a.in, a.out = out.Usage.InputTokens, out.Usage.OutputTokens
+	a.in, a.out = out.InputTokens, out.OutputTokens
 	return session.Message{Role: session.RoleAssistant, Content: a.reply, Provider: "anthropic", Model: model}, nil
 }
 
@@ -213,7 +213,7 @@ func TestLiveExtraction(t *testing.T) {
 				pass, err := x.ExtractPass(ctx, window, existing)
 				elapsed += time.Since(start)
 				reply, ai, ao := sender.last()
-				in, out, actualIn, actualOut = in+pass.Usage.InputTokens, out+pass.Usage.OutputTokens, actualIn+ai, actualOut+ao
+				in, out, actualIn, actualOut = in+pass.InputTokens, out+pass.OutputTokens, actualIn+ai, actualOut+ao
 				if err != nil {
 					t.Logf("pass %d failed: %v\nraw reply:\n%s", i+1, err, reply)
 					continue
