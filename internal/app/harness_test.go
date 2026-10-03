@@ -6,6 +6,7 @@ import (
 	"github.com/Dolmaa24/llmctl/internal/config"
 	"github.com/Dolmaa24/llmctl/internal/provider"
 	"github.com/Dolmaa24/llmctl/internal/ui/composer"
+	"github.com/Dolmaa24/llmctl/internal/ui/exportform"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerform"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -86,11 +87,11 @@ func (h *harness) deliver(msg tea.Msg) {
 	h.queue = append(h.queue, cmd)
 }
 
-// isSubmission reports whether msg starts slow work: a message request or a
-// provider validation.
+// isSubmission reports whether msg starts slow work: a message request, a
+// provider validation or an export.
 func isSubmission(msg tea.Msg) bool {
 	switch msg.(type) {
-	case composer.SubmitMsg, providerform.SubmitMsg:
+	case composer.SubmitMsg, providerform.SubmitMsg, exportform.SubmitMsg:
 		return true
 	}
 	return false

@@ -62,6 +62,7 @@ func (m *Model) layout() tea.Cmd {
 	m.confirm.SetSize(m.width, m.height)
 	m.form.SetSize(m.width, m.height)
 	m.remove.SetSize(m.width, m.height)
+	m.export.SetSize(m.width, m.height)
 
 	if !m.visible(m.focus) {
 		return m.setFocus(paneComposer)
@@ -86,6 +87,9 @@ func (m Model) View() string {
 	}
 	if m.remove.Visible() {
 		return m.remove.View()
+	}
+	if m.export.Visible() {
+		return m.export.View()
 	}
 
 	middle := lipgloss.JoinVertical(lipgloss.Left, m.transcript.View(), m.composer.View())
@@ -117,9 +121,13 @@ func (m Model) help() string {
 	case m.focus == paneProviders:
 		pairs = [][2]string{{"↑↓", "move"}, {"s", "switch"}, {"a", "add"}, {"e", "edit"}, {"r", "remove"}, {"tab", "pane"}, {"q", "quit"}}
 	case m.focus == paneNotes:
-		pairs = [][2]string{{"↑↓", "scroll"}, {"t", "filter"}, {"tab", "pane"}, {"q", "quit"}}
+		pairs = [][2]string{{"↑↓", "scroll"}, {"t", "filter"}}
+		pairs = append(pairs, m.exportHelp()...)
+		pairs = append(pairs, [2]string{"tab", "pane"}, [2]string{"q", "quit"})
 	default:
-		pairs = [][2]string{{"↑↓", "scroll"}, {"tab", "pane"}, {"q", "quit"}}
+		pairs = [][2]string{{"↑↓", "scroll"}}
+		pairs = append(pairs, m.exportHelp()...)
+		pairs = append(pairs, [2]string{"tab", "pane"}, [2]string{"q", "quit"})
 	}
 
 	var out string
@@ -130,6 +138,15 @@ func (m Model) help() string {
 		out += styles.Key.Render(p[0]) + styles.Help.Render(" "+p[1])
 	}
 	return lipgloss.NewStyle().Width(m.width).MaxHeight(1).Padding(0, 1).Render(out)
+}
+
+// exportHelp is the export key's hint, offered only when exporting is
+// available.
+func (m Model) exportHelp() [][2]string {
+	if m.deps.Export == nil {
+		return nil
+	}
+	return [][2]string{{"x", "export"}}
 }
 
 // planFor builds the comparison shown before a switch. Integration replaces

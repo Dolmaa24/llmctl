@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/Dolmaa24/llmctl/internal/ui/composer"
 	"github.com/Dolmaa24/llmctl/internal/ui/confirm"
+	"github.com/Dolmaa24/llmctl/internal/ui/exportform"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerform"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerpane"
 	"github.com/Dolmaa24/llmctl/internal/ui/switchconfirm"
@@ -69,6 +70,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case confirm.CancelledMsg:
 		m.removeTarget = ""
 		return m, nil
+
+	case exportform.SubmitMsg:
+		return m.submitExport(msg)
+
+	case exportform.DismissMsg:
+		m.closeExport()
+		return m, nil
+
+	case exportedMsg:
+		return m.receiveExport(msg)
 	}
 	return m, nil
 }
@@ -95,6 +106,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.remove.Visible() {
 		var cmd tea.Cmd
 		m.remove, cmd = m.remove.Update(msg)
+		return m, cmd
+	}
+	if m.export.Visible() {
+		var cmd tea.Cmd
+		m.export, cmd = m.export.Update(msg)
 		return m, cmd
 	}
 
@@ -140,6 +156,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if item, ok := m.providers.Selected(); ok {
 			m.askRemove(item)
 		}
+		return m, nil
+	case key.Matches(msg, Keys.Export) && (m.focus == paneTranscript || m.focus == paneNotes):
+		m.openExport()
 		return m, nil
 	}
 

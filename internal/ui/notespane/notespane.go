@@ -53,6 +53,11 @@ func (m *Model) SetNotes(notes []session.Note) {
 	}
 }
 
+// Notes returns every note the pane holds, superseded ones included. The root
+// model reads these when exporting rather than keeping a second copy that
+// could drift out of step.
+func (m Model) Notes() []session.Note { return m.notes }
+
 // chromeRows is the height the frame takes that is not notes: two border rows,
 // the title, the blank under it, and the hint line.
 //

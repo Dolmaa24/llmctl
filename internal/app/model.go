@@ -10,6 +10,7 @@ import (
 	"github.com/Dolmaa24/llmctl/internal/session"
 	"github.com/Dolmaa24/llmctl/internal/ui/composer"
 	"github.com/Dolmaa24/llmctl/internal/ui/confirm"
+	"github.com/Dolmaa24/llmctl/internal/ui/exportform"
 	"github.com/Dolmaa24/llmctl/internal/ui/notespane"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerform"
 	"github.com/Dolmaa24/llmctl/internal/ui/providerpane"
@@ -33,6 +34,14 @@ type Deps struct {
 
 	// Kinds are the provider types the add form offers.
 	Kinds []providerform.Kind
+
+	// Export renders the session for exporting (SRS FR-5.3). Nil means
+	// exporting is not available.
+	Export SessionExporter
+
+	// ExportDir is where an export with a relative file name is written.
+	// Empty means the directory llmctl was started in.
+	ExportDir string
 }
 
 // State is what the panes show at startup.
@@ -65,6 +74,7 @@ type Model struct {
 	confirm    switchconfirm.Model
 	form       providerform.Model
 	remove     confirm.Model
+	export     exportform.Model
 
 	deps Deps
 
@@ -92,6 +102,10 @@ type Model struct {
 	// The provider the open removal confirmation would remove.
 	removeTarget string
 
+	// exportSeq numbers exports, so a result that arrives after its form was
+	// closed is not shown in a form opened since.
+	exportSeq int
+
 	focus  pane
 	width  int
 	height int
@@ -114,6 +128,7 @@ func New(d Deps, s State) Model {
 		confirm:    switchconfirm.New(),
 		form:       providerform.New(),
 		remove:     confirm.New(),
+		export:     exportform.New(),
 		deps:       d,
 		messages:   s.Messages,
 		sessionID:  "local",

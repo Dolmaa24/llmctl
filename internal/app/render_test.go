@@ -82,6 +82,7 @@ func TestFrameIsExactlyTerminalHeight(t *testing.T) {
 		overlays := [][]string{
 			append(toProviders, "s"),         // switch confirmation
 			append(toProviders, "down", "r"), // removal confirmation
+			{"tab", "tab", "x"},              // export form
 		}
 		for _, keys := range append([][]string{nil, {"tab"}, {"tab", "tab"}}, overlays...) {
 			out := render(t, w, h, keys...)

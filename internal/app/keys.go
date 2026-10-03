@@ -21,6 +21,9 @@ type KeyMap struct {
 	Add    key.Binding
 	Edit   key.Binding
 	Remove key.Binding
+
+	// In the transcript and notes panes, the two views of what is exported.
+	Export key.Binding
 }
 
 var Keys = KeyMap{
@@ -33,4 +36,5 @@ var Keys = KeyMap{
 	Add:       key.NewBinding(key.WithKeys("a")),
 	Edit:      key.NewBinding(key.WithKeys("e")),
 	Remove:    key.NewBinding(key.WithKeys("r")),
+	Export:    key.NewBinding(key.WithKeys("x")),
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -83,9 +84,9 @@ func DemoState() State {
 }
 
 // DemoDeps returns stand-in services: adapters for the three providers,
-// in-memory config and key stores, and a validator. Each satisfies the same
-// contract interface as the real one, so replacing them is a change to
-// main.go and nothing else.
+// in-memory config and key stores, a validator and an exporter. Each has the
+// same shape as the real one, so replacing them is a change to main.go and
+// nothing else.
 //
 // The adapters read the demo key store rather than failing on a fixed flag,
 // so the demo story can be completed: OpenRouter fails while its saved key is
@@ -117,7 +118,42 @@ func DemoDeps(delay time.Duration) Deps {
 		Secrets:  secrets,
 		Validate: demoValidator(delay),
 		Kinds:    ProviderKinds(func(string) string { return "" }),
+		Export:   demoExport,
 	}
+}
+
+// demoExport stands in for storage's exporter until the storage module is
+// merged, when main.go passes storage.ExportJSON and storage.ExportMarkdown
+// instead. Like the demo adapter's replies, its output says it is a stand-in,
+// so a file the demo writes is never mistaken for the contract §10 format.
+func demoExport(f ExportFormat, r SessionRecord, at time.Time) ([]byte, error) {
+	const note = "Demo export: written by a stand-in until the storage module's exporter is wired in."
+	if f == ExportJSON {
+		return json.MarshalIndent(struct {
+			Note       string        `json:"note"`
+			ExportedAt time.Time     `json:"exported_at"`
+			Session    SessionRecord `json:"session"`
+		}{note, at.UTC(), r}, "", "  ")
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Session %s\n\n_%s_\n\n", r.Session.ID, note)
+	for _, m := range r.Messages {
+		who := "You"
+		if m.Role != session.RoleUser {
+			who = m.Provider + "/" + m.Model
+		}
+		fmt.Fprintf(&b, "**%s**\n\n%s\n\n", who, m.Content)
+	}
+	b.WriteString("## Notes\n\n")
+	for _, n := range r.Notes {
+		line := "- " + n.Content
+		if !n.Active() {
+			line += " (superseded)"
+		}
+		b.WriteString(line + "\n")
+	}
+	return []byte(b.String()), nil
 }
 
 // demoKeyProblem is what a real provider would say about the saved key.
