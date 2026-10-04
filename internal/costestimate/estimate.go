@@ -5,7 +5,7 @@
 // defined (TASK-005).
 package costestimate
 
-import "github.com/DhairyaP4/llmctl/internal/session"
+import "github.com/Dolmaa24/llmctl/internal/session"
 
 // Estimator counts tokens consistently across providers.
 //

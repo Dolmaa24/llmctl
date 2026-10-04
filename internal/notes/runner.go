@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DhairyaP4/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 // Schedule is when extraction runs, which is PRD open question #1. It counts

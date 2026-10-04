@@ -3,12 +3,12 @@ package mock
 import (
 	"testing"
 
-	"github.com/DhairyaP4/llmctl/internal/config"
-	"github.com/DhairyaP4/llmctl/internal/doctor"
-	"github.com/DhairyaP4/llmctl/internal/notes"
-	"github.com/DhairyaP4/llmctl/internal/provider"
-	"github.com/DhairyaP4/llmctl/internal/shell"
-	"github.com/DhairyaP4/llmctl/internal/storage"
+	"github.com/Dolmaa24/llmctl/internal/config"
+	"github.com/Dolmaa24/llmctl/internal/doctor"
+	"github.com/Dolmaa24/llmctl/internal/notes"
+	"github.com/Dolmaa24/llmctl/internal/provider"
+	"github.com/Dolmaa24/llmctl/internal/shell"
+	"github.com/Dolmaa24/llmctl/internal/storage"
 )
 
 // TestMocksSatisfyContract fails to compile if any mock drifts from the

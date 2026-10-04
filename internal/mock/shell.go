@@ -5,9 +5,9 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/DhairyaP4/llmctl/internal/doctor"
-	"github.com/DhairyaP4/llmctl/internal/session"
-	"github.com/DhairyaP4/llmctl/internal/shell"
+	"github.com/Dolmaa24/llmctl/internal/doctor"
+	"github.com/Dolmaa24/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/shell"
 )
 
 // Detector is a configurable shell.Detector.

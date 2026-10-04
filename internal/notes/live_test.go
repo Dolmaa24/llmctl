@@ -29,8 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DhairyaP4/llmctl/internal/costestimate"
-	"github.com/DhairyaP4/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/costestimate"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 // liveSender is a Sender that also keeps the raw reply, and the provider's

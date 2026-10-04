@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DhairyaP4/llmctl/internal/costestimate"
-	"github.com/DhairyaP4/llmctl/internal/notes"
-	"github.com/DhairyaP4/llmctl/internal/provider"
-	"github.com/DhairyaP4/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/costestimate"
+	"github.com/Dolmaa24/llmctl/internal/notes"
+	"github.com/Dolmaa24/llmctl/internal/provider"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 // Any provider adapter can do the extracting.

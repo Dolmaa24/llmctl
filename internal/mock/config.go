@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/DhairyaP4/llmctl/internal/config"
+	"github.com/Dolmaa24/llmctl/internal/config"
 )
 
 // ConfigStore is an in-memory config.Store.

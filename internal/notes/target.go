@@ -20,9 +20,9 @@ type Target struct {
 var cheapModels = map[string]string{
 	"anthropic":  "claude-haiku-4-5-20251001",
 	"openrouter": "anthropic/claude-haiku-4.5",
-	// ollama: placeholder until go test -tags live picks the smallest model
-	// that retains nearly all planted facts on Sanket's laptop (TASK-022).
-	"ollama": "llama3.1:8b",
+	// ollama: gemma3:latest scored 8/9 facts kept in 19s during laptop tests.
+	// We will eventually load this from P5's config store.
+	"ollama": "gemma3:latest",
 }
 
 // CheapTarget chooses where to take notes on a conversation that has been

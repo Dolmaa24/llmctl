@@ -142,6 +142,14 @@ func (b *Builder) BuildHandoff(ctx context.Context, sess *Session) (HandoffPlan,
 
 	plan.EstimatedTokensFullReplay = b.counter.CountMessages(msgs)
 	plan.EstimatedTokensDistilled = b.counter.CountMessages(plan.Payload())
+
+	// Fallback to full replay if distilled is more expensive
+	if plan.EstimatedTokensDistilled >= plan.EstimatedTokensFullReplay {
+		plan.Notes = nil
+		plan.RecentRawTurns = msgs
+		plan.EstimatedTokensDistilled = plan.EstimatedTokensFullReplay
+	}
+
 	return plan, nil
 }
 

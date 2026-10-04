@@ -1,4 +1,4 @@
-module github.com/DhairyaP4/llmctl
+module github.com/Dolmaa24/llmctl
 
 go 1.25.0
 

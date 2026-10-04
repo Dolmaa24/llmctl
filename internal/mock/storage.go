@@ -7,7 +7,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/DhairyaP4/llmctl/internal/session"
+	"github.com/Dolmaa24/llmctl/internal/session"
 )
 
 // SessionsRepo is an in-memory storage.SessionsRepo.
