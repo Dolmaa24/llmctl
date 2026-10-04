@@ -69,3 +69,10 @@ func (s *SecretStore) SetAPIKey(providerID, apiKey string) error {
 	s.keys[providerID] = apiKey
 	return nil
 }
+
+func (s *SecretStore) HasAPIKey(providerID string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.keys[providerID]
+	return ok, nil
+}

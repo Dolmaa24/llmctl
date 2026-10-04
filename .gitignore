@@ -3,6 +3,7 @@
 *.db-journal
 *.db-wal
 *.age
+*.age.index
 config.toml
 .env
 .env.local

@@ -83,6 +83,27 @@ type SwitchEvent struct {
 **Owner:** Person 4 (handoff logic) writes this; Person 5 (storage) persists it
 **Consumed by:** `ui/switchconfirm` (reads the estimate before confirming), `storage/switch_events_repo`
 
+### 2.4 `ExtractionRun`
+
+```go
+type ExtractionRun struct {
+    ID                 string
+    SessionID          string
+    ThroughSequenceNum int
+    Provider           string
+    Model              string
+    PromptVersion      string
+    InputTokens        int
+    OutputTokens       int
+    NoteIDs            []string
+    Err                string
+    CreatedAt          time.Time
+}
+```
+
+**Owner:** Person 4 (notes module)
+**Consumed by:** `storage/extraction_runs_repo`, `notes/runner.go`
+
 ---
 
 ## 3. Provider Adapter Interface
@@ -280,6 +301,11 @@ type SwitchEventsRepo interface {
     Create(ctx context.Context, e *session.SwitchEvent) error
     ListBySession(ctx context.Context, sessionID string) ([]session.SwitchEvent, error)
 }
+
+type ExtractionRunsRepo interface {
+    Create(ctx context.Context, r *session.ExtractionRun) error
+    ListBySession(ctx context.Context, sessionID string) ([]session.ExtractionRun, error)
+}
 ```
 
 **Owner:** Person 5
@@ -304,11 +330,19 @@ type SecretStore interface {
     // GetAPIKey returns the decrypted API key for a provider, decrypting on demand.
     GetAPIKey(providerID string) (string, error)
     SetAPIKey(providerID, apiKey string) error
+
+    // HasAPIKey reports whether a key is stored for a provider, without decrypting it.
+    HasAPIKey(providerID string) (bool, error)
 }
 ```
 
 **Owner:** Person 5
-**Consumed by:** `provider/*` adapters (via `GetAPIKey`), `app` init (loads config on startup)
+**Consumed by:** `provider/*` adapters (via `GetAPIKey`), `app` init (loads config on startup), `app` provider form and provider list (via `HasAPIKey`)
+
+**Contract notes:**
+- `GetAPIKey` returns an error matching `config.ErrNoSecret` when no key is stored. For Ollama, which needs no key, that is the normal case and not a failure.
+- `GetProviderConfig` returns an error matching `config.ErrNotConfigured` for an unknown provider.
+- A caller that only needs to know whether a key exists must call `HasAPIKey`, so a decrypted key is never brought into memory just to be discarded (SRS NFR-4).
 
 ---
 
