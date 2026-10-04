@@ -1,22 +1,40 @@
 // Command llmctl is the entrypoint for the terminal dashboard and its
 // non-interactive subcommands.
-//
-// Scaffold only: subcommand wiring lands with the vertical slice in Phase 2.
 package main
 
 import (
 	"fmt"
 	"os"
+	"time"
+
+	"github.com/Dolmaa24/llmctl/internal/app"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // version is set at build time by the release pipeline.
 var version = "dev"
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println("llmctl", version)
-		return
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version":
+			fmt.Println("llmctl", version)
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "llmctl: unknown command %q\n", os.Args[1])
+			os.Exit(2)
+		}
 	}
-	fmt.Fprintln(os.Stderr, "llmctl: not yet implemented — scaffold only")
-	os.Exit(1)
+
+	// Demo mode until the storage, config and provider modules land.
+	// Replacing these lines with the real services changes nothing inside
+	// the app.
+	deps := app.DemoDeps(900 * time.Millisecond)
+	deps.Kinds = app.ProviderKinds(os.Getenv)
+
+	p := tea.NewProgram(app.New(deps, app.DemoState()), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "llmctl:", err)
+		os.Exit(1)
+	}
 }

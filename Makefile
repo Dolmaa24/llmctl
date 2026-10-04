@@ -3,8 +3,9 @@
 build:
 	go build -o bin/llmctl ./cmd/llmctl
 
+# A hung test fails in two minutes rather than the default ten.
 test:
-	go test ./...
+	go test -timeout 2m ./...
 
 vet:
 	go vet ./...
