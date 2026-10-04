@@ -29,7 +29,7 @@ func DemoState() State {
 	providers := []providerpane.Item{
 		{ID: "anthropic", Name: "Anthropic", Model: "claude-opus-5", Status: "ok", LatencyM: 412},
 		{ID: "openrouter", Name: "OpenRouter", Model: "meta-llama/llama-3.1-70b", Status: "fail"},
-		{ID: "ollama", Name: "Ollama", Model: "llama3.1:8b", Status: "ok", LatencyM: 35, Active: true},
+		{ID: "ollama", Name: "Ollama", Model: "gemma3:latest", Status: "ok", LatencyM: 35, Active: true},
 	}
 
 	t := time.Now().Add(-30 * time.Minute)
@@ -51,7 +51,7 @@ func DemoState() State {
 		{SessionID: "demo", SequenceNum: 4, Role: session.RoleUser,
 			Content: "Switched to a local model to keep iterating cheaply. Can you write the CAS loop?", CreatedAt: at(4)},
 		{SessionID: "demo", SequenceNum: 5, Role: session.RoleAssistant,
-			Provider: "ollama", Model: "llama3.1:8b",
+			Provider: "ollama", Model: "gemma3:latest",
 			Content: "Here is the compare-and-swap refill loop, retrying until the swap succeeds. It keeps the fast path lock-free while preserving the invariant you established earlier.", CreatedAt: at(5)},
 	}
 
@@ -95,7 +95,7 @@ func DemoDeps(delay time.Duration) Deps {
 	configs := &memConfigs{rows: map[string]config.ProviderConfig{
 		"anthropic":  {ID: "anthropic", DisplayName: "Anthropic", BaseURL: "https://api.anthropic.com", DefaultModel: "claude-opus-5", Enabled: true},
 		"openrouter": {ID: "openrouter", DisplayName: "OpenRouter", BaseURL: "https://openrouter.ai/api/v1", DefaultModel: "meta-llama/llama-3.1-70b", Enabled: true},
-		"ollama":     {ID: "ollama", DisplayName: "Ollama", BaseURL: "http://localhost:11434", DefaultModel: "llama3.1:8b", Enabled: true},
+		"ollama":     {ID: "ollama", DisplayName: "Ollama", BaseURL: "http://localhost:11434", DefaultModel: "gemma3:latest", Enabled: true},
 	}}
 	secrets := &memSecrets{keys: map[string]string{
 		"anthropic":  "sk-ant-demo-0000",

@@ -41,8 +41,8 @@ func TestSendingAppendsMessageAndAttributedReply(t *testing.T) {
 		t.Errorf("user turn = %+v", q)
 	}
 	// The reply must be attributed to the active provider (SRS FR-3.3).
-	if a.Role != session.RoleAssistant || a.Provider != "ollama" || a.Model != "llama3.1:8b" {
-		t.Errorf("reply attributed to %s: %s, want ollama: llama3.1:8b", a.Provider, a.Model)
+	if a.Role != session.RoleAssistant || a.Provider != "ollama" || a.Model != "gemma3:latest" {
+		t.Errorf("reply attributed to %s: %s, want ollama: gemma3:latest", a.Provider, a.Model)
 	}
 	if a.SequenceNum != q.SequenceNum+1 {
 		t.Errorf("reply sequence %d does not follow question %d", a.SequenceNum, q.SequenceNum)
@@ -263,7 +263,7 @@ func TestContextTooLargeNamesTheModelAndTheWayOut(t *testing.T) {
 			h.press("enter")
 
 			n := h.model().transcript.Notice()
-			for _, want := range []string{"ollama llama3.1:8b", "too long for this model's context window", "press s to switch"} {
+			for _, want := range []string{"ollama gemma3:latest", "too long for this model's context window", "press s to switch"} {
 				if !strings.Contains(n, want) {
 					t.Errorf("notice = %q, want it to contain %q", n, want)
 				}

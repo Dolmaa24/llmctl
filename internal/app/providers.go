@@ -58,8 +58,11 @@ func ProviderKinds(getenv func(string) string) []providerform.Kind {
 			BaseURL: "https://api.anthropic.com", Model: "claude-opus-5"},
 		{ID: "openrouter", Name: "OpenRouter", NeedsKey: true,
 			BaseURL: "https://openrouter.ai/api/v1", ModelHint: "e.g. meta-llama/llama-3.1-70b-instruct"},
+		// gemma3 rather than qwen3: qwen3 is a thinking model, and the Ollama
+		// adapter does not yet turn thinking off, so its reasoning could end
+		// up in the transcript.
 		{ID: "ollama", Name: "Ollama", NeedsKey: false,
-			BaseURL: ollama, Model: "llama3.1:8b"},
+			BaseURL: ollama, Model: "gemma3:latest"},
 	}
 }
 
