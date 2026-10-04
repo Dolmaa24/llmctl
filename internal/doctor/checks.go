@@ -4,6 +4,7 @@ package doctor
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -77,6 +78,16 @@ func (r *DefaultRunner) RunAll(ctx context.Context) []CheckResult {
 		wg.Add(1)
 		go func(idx int, chk Check) {
 			defer wg.Done()
+			defer func() {
+				if rec := recover(); rec != nil {
+					results[idx] = CheckResult{
+						Name:      chk.Name(),
+						Status:    StatusFail,
+						Message:   fmt.Sprintf("check panicked: %v", rec),
+						CheckedAt: time.Now(),
+					}
+				}
+			}()
 			results[idx] = chk.Run(runCtx)
 		}(i, c)
 	}

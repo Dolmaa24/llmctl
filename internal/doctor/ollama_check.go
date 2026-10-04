@@ -28,8 +28,9 @@ type ollamaTagsResponse struct {
 
 type ollamaPsResponse struct {
 	Models []struct {
-		Name string `json:"name"`
-		Size int64  `json:"size"`
+		Name     string `json:"name"`
+		Size     int64  `json:"size"`
+		SizeVRAM int64  `json:"size_vram"`
 	} `json:"models"`
 }
 
@@ -108,7 +109,9 @@ func (c OllamaCheck) Run(ctx context.Context) CheckResult {
 					var psData ollamaPsResponse
 					if json.Unmarshal(psBody, &psData) == nil {
 						for _, m := range psData.Models {
-							vramModels = append(vramModels, m.Name)
+							if m.SizeVRAM > 0 {
+								vramModels = append(vramModels, m.Name)
+							}
 						}
 					}
 				}

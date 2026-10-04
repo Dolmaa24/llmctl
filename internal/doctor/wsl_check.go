@@ -40,7 +40,7 @@ func (c WSLCheck) Run(ctx context.Context) CheckResult {
 	distro := getenv("WSL_DISTRO_NAME")
 	if distro != "" || getenv("WSL_INTEROP") != "" {
 		if distro == "" {
-			distro = "Ubuntu"
+			distro = "unknown"
 		}
 		result.Status = StatusOK
 		result.Message = fmt.Sprintf("WSL2 active inside distro %s", distro)

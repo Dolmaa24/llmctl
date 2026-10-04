@@ -30,6 +30,12 @@ BRANCH REVIEW P1 CHECKLIST IMPLEMENTATION (4 Oct 2026)
 - [x] cmd/llmctl/main.go updated to launch TUI on no args, preserving doctor and version subcommands.
 - [x] Moved P1_WORKLOG.txt from root to plan/P1_WORKLOG.txt.
 
+NEW FROM REVIEWING 6c6933a (4 Oct 2026)
+- [x] Document consolidation: Design doc movement to DOCS/ deferred to dedicated docs PR.
+- [x] WSLCheck reports distro as "unknown" when running inside WSL with WSL_DISTRO_NAME unset (wsl_check.go).
+- [x] OllamaCheck verifies loaded models are running on GPU via size_vram > 0 in /api/ps (ollama_check.go).
+- [x] Runner.RunAll recovers panics in goroutines to prevent taking down status bar per NFR-5 (checks.go).
+
 ISSUES_AND_FIXES
 - Issue: `wsl.exe --status` output can contain null characters (`\x00`) on Windows environment.
   Fix: added normalization in `summarizeWSLStatus()` before parsing fields.

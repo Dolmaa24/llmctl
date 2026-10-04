@@ -83,6 +83,26 @@ func TestWSLCheckInsideWSL(t *testing.T) {
 	}
 }
 
+func TestWSLCheckInsideWSL_UnknownDistro(t *testing.T) {
+	wsl := WSLCheck{
+		GOOS: "linux",
+		Getenv: func(key string) string {
+			if key == "WSL_INTEROP" {
+				return "/run/WSL/1_interop"
+			}
+			return ""
+		},
+	}
+
+	res := wsl.Run(context.Background())
+	if res.Status != StatusOK {
+		t.Fatalf("expected StatusOK, got %s: %s", res.Status, res.Message)
+	}
+	if !strings.Contains(res.Message, "WSL2 active inside distro unknown") {
+		t.Fatalf("unexpected message: %s", res.Message)
+	}
+}
+
 func TestNetworkCheck(t *testing.T) {
 	fakeClient := fakeHTTPClient{
 		handler: func(req *http.Request) (*http.Response, error) {
@@ -115,7 +135,8 @@ func TestOllamaCheck(t *testing.T) {
 				}, nil
 			}
 			if strings.HasSuffix(req.URL.Path, "/api/ps") {
-				body := `{"models":[{"name":"llama3.1:8b","size":4000000000}]}`
+				// llama3.1:8b is loaded on GPU (size_vram > 0), cpu_model:7b is loaded on CPU (size_vram == 0)
+				body := `{"models":[{"name":"llama3.1:8b","size":4000000000,"size_vram":4000000000},{"name":"cpu_model:7b","size":3500000000,"size_vram":0}]}`
 				return &http.Response{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(bytes.NewBufferString(body)),
@@ -137,6 +158,9 @@ func TestOllamaCheck(t *testing.T) {
 	}
 	if !strings.Contains(res.Message, "ollama active (1 models pulled, VRAM: llama3.1:8b)") {
 		t.Fatalf("unexpected message: %s", res.Message)
+	}
+	if strings.Contains(res.Message, "cpu_model:7b") {
+		t.Fatalf("expected CPU-only model (size_vram=0) to be excluded from VRAM list, got message: %s", res.Message)
 	}
 }
 
@@ -166,3 +190,36 @@ func TestSummarizeWSLStatus(t *testing.T) {
 		t.Fatalf("version mismatch: %q", s.DefaultVersion)
 	}
 }
+
+type panicCheck struct{}
+
+func (panicCheck) Name() string { return "panic_check" }
+func (panicCheck) Run(_ context.Context) CheckResult {
+	panic("simulated check panic")
+}
+
+func TestRunnerPanicRecovery(t *testing.T) {
+	r := NewRunner()
+	r.Register(fakeCheck{name: "ok_check", status: StatusOK})
+	r.Register(panicCheck{})
+
+	results := r.RunAll(context.Background())
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	if results[0].Status != StatusOK {
+		t.Fatalf("expected first check StatusOK, got %s", results[0].Status)
+	}
+
+	if results[1].Name != "panic_check" {
+		t.Fatalf("expected second check name panic_check, got %s", results[1].Name)
+	}
+	if results[1].Status != StatusFail {
+		t.Fatalf("expected panicked check StatusFail, got %s", results[1].Status)
+	}
+	if !strings.Contains(results[1].Message, "check panicked: simulated check panic") {
+		t.Fatalf("unexpected panic message: %s", results[1].Message)
+	}
+}
+
