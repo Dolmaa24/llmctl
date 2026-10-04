@@ -142,15 +142,16 @@ func (m Model) receive(r replyMsg) (tea.Model, tea.Cmd) {
 //
 // The contract gives the error no fields, so the token counts appear only
 // when the adapter wraps the sentinel with them, and adapters word that
-// differently. The Ollama adapter writes them first,
+// differently. The Ollama adapter merged in #3 writes them first,
 // "ollama gemma3:latest: about 9214 tokens will not fit in a window of 8192: <sentinel>",
-// while fmt.Errorf("%w: needs 9214 of 8192 tokens", ...) puts them after.
-// Detail from either side is shown as given.
+// and its fix in #6 writes them after,
+// "<sentinel>: ollama gemma3:latest: about 9214 tokens will not fit in a window of 8192".
+// Detail from either side is shown, without the provider and model.
 func contextTooLargeNotice(providerID, model string, err error) string {
 	var details []string
 	if before, after, ok := strings.Cut(err.Error(), provider.ErrContextTooLarge.Error()); ok {
-		for _, d := range []string{leadingDetail(before, providerID, model), strings.TrimSpace(strings.TrimPrefix(after, ":"))} {
-			if d != "" {
+		for _, side := range []string{before, after} {
+			if d := ownDetail(side, providerID, model); d != "" {
 				details = append(details, d)
 			}
 		}
@@ -163,10 +164,12 @@ func contextTooLargeNotice(providerID, model string, err error) string {
 		"Press tab, choose a model with a larger window, and press s to switch.", providerID, model, detail)
 }
 
-// leadingDetail is what an adapter wrote before the sentinel, without the
-// provider and model it may name itself by: the notice names them already.
-func leadingDetail(before, providerID, model string) string {
-	d := strings.TrimSuffix(strings.TrimSpace(before), ":")
+// ownDetail is what an adapter wrote on one side of the sentinel, without the
+// colon joining it to the sentinel or the provider and model the adapter may
+// name itself by: the notice names them already.
+func ownDetail(side, providerID, model string) string {
+	d := strings.TrimSpace(side)
+	d = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(d, ":"), ":"))
 	for _, name := range []string{providerID + " " + model, providerID} {
 		if d == name {
 			return ""

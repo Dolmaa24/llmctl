@@ -257,6 +257,9 @@ func TestContextTooLargeNamesTheModelAndTheWayOut(t *testing.T) {
 		// first, after the provider and model it names itself by.
 		{"counts before the sentinel", fmt.Errorf("ollama %s: about %d tokens will not fit in a window of %d: %w",
 			"gemma3:latest", 9214, 8192, provider.ErrContextTooLarge), "(about 9214 tokens will not fit in a window of 8192)"},
+		// The wording of its fix in #6: the sentinel first, then the same.
+		{"counts after the sentinel", fmt.Errorf("%w: ollama %s: about %d tokens will not fit in a window of %d",
+			provider.ErrContextTooLarge, "gemma3:latest", 9214, 8192), "(about 9214 tokens will not fit in a window of 8192)"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
