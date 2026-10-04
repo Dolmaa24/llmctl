@@ -30,9 +30,9 @@ const (
 	Continuous Schedule = 1
 )
 
-// DefaultSchedule is the baseline schedule used for new runners.
-// Tuned to AtSwitch to prevent background processing from melting laptop GPUs.
-var DefaultSchedule = AtSwitch
+// DefaultSchedule will be set once the laptop measurement (TASK-022) determines
+// whether AtSwitch or Continuous fits in VRAM without delaying replies.
+// Do not set a default here until the measurement is done.
 
 // NoteStore is satisfied by storage.NotesRepo.
 type NoteStore interface {
@@ -44,10 +44,8 @@ type NoteStore interface {
 // Ledger keeps the record of extraction runs: the token ledger of plan
 // TASK-020, and the record of how far extraction has read.
 //
-// Nothing in storage satisfies it yet. That needs an extraction_runs table,
-// an interface change for the storage module to approve. Until then
-// mock.Ledger keeps runs in memory, and a restart forgets them, so the first
-// pass after a restart reads the whole transcript again.
+// storage.ExtractionRunsRepo (PR4, feature/dhairya-p4) satisfies this interface
+// and persists runs to SQLite. mock.Ledger remains for unit tests.
 // Ledger is satisfied by storage.ExtractionRunsRepo.
 type Ledger interface {
 	Create(ctx context.Context, r *session.ExtractionRun) error

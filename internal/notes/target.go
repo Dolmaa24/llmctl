@@ -20,7 +20,9 @@ type Target struct {
 var cheapModels = map[string]string{
 	"anthropic":  "claude-haiku-4-5-20251001",
 	"openrouter": "anthropic/claude-haiku-4.5",
-	"ollama":     "llama3.1:8b",
+	// ollama: placeholder until go test -tags live picks the smallest model
+	// that retains nearly all planted facts on Sanket's laptop (TASK-022).
+	"ollama": "llama3.1:8b",
 }
 
 // CheapTarget chooses where to take notes on a conversation that has been
@@ -33,15 +35,10 @@ var cheapModels = map[string]string{
 // merely having an Anthropic key configured would send every exchange of a
 // conversation held on a local model to Anthropic to be summarised.
 //
-// A local provider has no entry, so extraction there runs on the model the
-// conversation is already using: it costs nothing per token, keeps the
-// conversation on the user's machine, and is already loaded, where a second
-// local model would have to be swapped into memory on every pass.
-//
-// Any other provider without an entry also extracts on the conversation's own
-// model. That is correct but not cheap: a new hosted provider should add its
-// cheapest good model here, or better, declare it itself once the provider
-// contract lets it.
+// A local provider currently has a placeholder entry (see cheapModels above).
+// Once the live test on the laptop picks a specific model, the placeholder will
+// be replaced with the exact tag and quantization. An unlisted provider falls
+// back to the conversation's own model.
 func CheapTarget(conversation Target) Target {
 	if model, ok := cheapModels[conversation.Provider]; ok {
 		return Target{Provider: conversation.Provider, Model: model}
