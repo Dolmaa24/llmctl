@@ -186,7 +186,7 @@ func TestLiveExtraction(t *testing.T) {
 		models = []string{cheapModels["anthropic"]}
 	default:
 		newSender = func() liveSender { return &ollama{} }
-		models = []string{"qwen2.5-coder:7b", "llama3.1:8b"}
+		models = []string{"qwen2.5-coder:7b", "gemma3:latest"}
 	}
 	if env := os.Getenv("LIVE_MODELS"); env != "" {
 		models = strings.Split(env, ",")

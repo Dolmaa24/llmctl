@@ -242,7 +242,7 @@ func TestProvidersAreNeverMixedInAPass(t *testing.T) {
 	if strings.Contains(local.prompts[0], "Opus") || !strings.Contains(local.prompts[0], "asked of qwen") {
 		t.Errorf("the local pass read the wrong turns:\n%s", local.prompts[0])
 	}
-	if hosted.model != haiku || local.model != "llama3.1:8b" {
+	if hosted.model != haiku || local.model != "gemma3:latest" {
 		t.Errorf("models: hosted %q, local %q", hosted.model, local.model)
 	}
 	if runs := rg.runs(); len(runs) != 2 || runs[0].ThroughSequenceNum != 1 || runs[1].ThroughSequenceNum != 3 {
@@ -262,8 +262,8 @@ func TestALocalPassUsesTheDedicatedModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	// One provider, so one pass, on the dedicated model.
-	if local.calls != 1 || local.model != "llama3.1:8b" {
-		t.Errorf("%d calls on %q, want one on llama3.1:8b", local.calls, local.model)
+	if local.calls != 1 || local.model != "gemma3:latest" {
+		t.Errorf("%d calls on %q, want one on gemma3:latest", local.calls, local.model)
 	}
 }
 
