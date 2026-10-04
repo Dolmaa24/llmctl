@@ -4,6 +4,7 @@ package doctor
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -42,4 +43,44 @@ type Check interface {
 type Runner interface {
 	Register(c Check)
 	RunAll(ctx context.Context) []CheckResult
+}
+
+// DefaultRunner is the standard in-memory implementation of Runner.
+type DefaultRunner struct {
+	checks []Check
+}
+
+// NewRunner creates an empty DefaultRunner ready for registering checks.
+func NewRunner() *DefaultRunner {
+	return &DefaultRunner{checks: make([]Check, 0)}
+}
+
+func (r *DefaultRunner) Register(c Check) {
+	if c == nil {
+		return
+	}
+	r.checks = append(r.checks, c)
+}
+
+func (r *DefaultRunner) RunAll(ctx context.Context) []CheckResult {
+	if len(r.checks) == 0 {
+		return nil
+	}
+
+	results := make([]CheckResult, len(r.checks))
+	var wg sync.WaitGroup
+
+	runCtx, cancel := context.WithTimeout(ctx, CheckTimeout)
+	defer cancel()
+
+	for i, c := range r.checks {
+		wg.Add(1)
+		go func(idx int, chk Check) {
+			defer wg.Done()
+			results[idx] = chk.Run(runCtx)
+		}(i, c)
+	}
+
+	wg.Wait()
+	return results
 }
