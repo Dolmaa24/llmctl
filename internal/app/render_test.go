@@ -158,7 +158,37 @@ func TestPaneBordersAreIntact(t *testing.T) {
 		failed.hold("enter")
 		failed.press("esc")
 		check("notice", failed.view(), w, h)
+
+		// The composer's title names the active model, and some model ids
+		// are long enough to wrap it.
+		check("long model id", newHarness(t, w, h, withLongModel()).view(), w, h)
 	}
+}
+
+// withLongModel makes the active provider's model id longer than the
+// composer's title has room for at any supported size.
+func withLongModel() option {
+	return func(_ *Deps, s *State) {
+		for i := range s.Providers {
+			if s.Providers[i].Active {
+				s.Providers[i].Model = "meta-llama/llama-3.1-70b-instruct:extended-context"
+			}
+		}
+	}
+}
+
+// A model id too long for the composer's title is shortened, not wrapped.
+func TestLongModelIdIsShortenedInTheComposerTitle(t *testing.T) {
+	out := newHarness(t, 80, 24, withLongModel()).view()
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "MESSAGE") {
+			if !strings.Contains(line, "…") {
+				t.Errorf("long model id not shortened: %q", line)
+			}
+			return
+		}
+	}
+	t.Fatal("no composer title in the frame")
 }
 
 // Moving focus must not change any pane's size.

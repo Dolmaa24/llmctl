@@ -127,11 +127,31 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) View() string {
 	title := styles.PaneTitle("MESSAGE", m.focused)
+
+	// The title must stay on one line. A long model id, such as
+	// OpenRouter's, would otherwise wrap onto a second row, push the frame
+	// past its slot, and lose the bottom border to Frame's height cap.
+	room := styles.Inner(m.width) - lipgloss.Width(title)
 	switch {
 	case m.busy:
-		title += styles.Ghost.Render("  waiting for reply · esc to cancel")
+		title += styles.Ghost.Render(fit("  waiting for reply · esc to cancel", room))
 	case m.target != "":
-		title += styles.Dim.Render("  → " + m.target)
+		title += styles.Dim.Render(fit("  → "+m.target, room))
 	}
 	return styles.Frame(title+"\n"+m.ta.View(), m.width, m.height, m.focused)
+}
+
+// fit shortens s to at most w cells, marking the cut with "…".
+func fit(s string, w int) string {
+	if lipgloss.Width(s) <= w {
+		return s
+	}
+	if w <= 0 {
+		return ""
+	}
+	r := []rune(s)
+	for len(r) > 0 && lipgloss.Width(string(r))+1 > w {
+		r = r[:len(r)-1]
+	}
+	return string(r) + "…"
 }
