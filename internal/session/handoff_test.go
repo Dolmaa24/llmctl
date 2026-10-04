@@ -109,6 +109,29 @@ func TestLongSessionIsMuchCheaperDistilled(t *testing.T) {
 	}
 }
 
+// When distilled notes cost more than sending the full chat history, the builder
+// must clear the notes and fall back to sending the full raw transcript.
+func TestDistilledFallbackWhenMoreExpensive(t *testing.T) {
+	msgs := conversation("s1", 10, 5) // A medium length conversation
+	var notes []session.Note
+	// 20 enormous notes will easily exceed the tokens of the conversation.
+	for i := 0; i < 20; i++ {
+		notes = append(notes, note(fmt.Sprintf("n%d", i), strings.Repeat("a very long fact about something ", 30), i))
+	}
+	f := newFixture(t, msgs, notes)
+	plan := f.build(t, 4)
+
+	if len(plan.Notes) != 0 {
+		t.Errorf("notes array was not cleared on fallback")
+	}
+	if len(plan.RecentRawTurns) != len(msgs) {
+		t.Errorf("fallback sent %d turns, want the full %d", len(plan.RecentRawTurns), len(msgs))
+	}
+	if plan.EstimatedTokensDistilled != plan.EstimatedTokensFullReplay {
+		t.Errorf("estimated %d != replay %d on fallback", plan.EstimatedTokensDistilled, plan.EstimatedTokensFullReplay)
+	}
+}
+
 // A session that fits in the recent window is handed over whole. Adding notes
 // would only repeat what is sent verbatim, so the honest result is no saving.
 func TestShortSessionIsHandedOverWhole(t *testing.T) {
