@@ -1,38 +1,9 @@
 package shell
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 )
-
-func TestSystemExporterExport(t *testing.T) {
-	var b bytes.Buffer
-	exported := map[string]string{}
-	exp := SystemExporter{
-		Writer: &b,
-		Setenv: func(k, v string) error {
-			exported[k] = v
-			return nil
-		},
-	}
-
-	vars := map[string]string{
-		"ANTHROPIC_API_KEY": "a'b",
-	}
-
-	if err := exp.Export(KindPowerShell, vars); err != nil {
-		t.Fatalf("export failed: %v", err)
-	}
-
-	if exported["ANTHROPIC_API_KEY"] != "a'b" {
-		t.Fatalf("setenv mismatch")
-	}
-	out := b.String()
-	if !strings.Contains(out, "$env:ANTHROPIC_API_KEY='a''b'") {
-		t.Fatalf("unexpected powershell output: %s", out)
-	}
-}
 
 func TestSystemRendererSnippet(t *testing.T) {
 	r := SystemRenderer{}
@@ -54,5 +25,38 @@ func TestSystemRendererSnippet(t *testing.T) {
 	}
 	if !strings.Contains(bashSnippet, "export KEY='val'\"'\"'ue'") {
 		t.Fatalf("unexpected bash snippet: %s", bashSnippet)
+	}
+}
+
+func TestSystemRendererSnippetCurlyQuotes(t *testing.T) {
+	r := SystemRenderer{}
+	vars := map[string]string{
+		"QUOTES": "‘smart’ ‚quotes‛ and 'single'",
+	}
+
+	psSnippet, err := r.Snippet(KindPowerShell, vars)
+	if err != nil {
+		t.Fatalf("snippet ps failed: %v", err)
+	}
+	expected := "$env:QUOTES='‘‘smart’’ ‚‚quotes‛‛ and ''single'''"
+	if !strings.Contains(psSnippet, expected) {
+		t.Fatalf("unexpected curly quotes snippet: got %q, expected substring %q", psSnippet, expected)
+	}
+}
+
+func TestSystemRendererSnippetInvalidVarName(t *testing.T) {
+	r := SystemRenderer{}
+	invalidVars := []map[string]string{
+		{"123INVALID": "val"},
+		{"KEY-WITH-DASH": "val"},
+		{"KEY$DOLLAR": "val"},
+		{"KEY WITH SPACE": "val"},
+	}
+
+	for _, vars := range invalidVars {
+		_, err := r.Snippet(KindPowerShell, vars)
+		if err == nil {
+			t.Fatalf("expected error for invalid var name %+v, got nil", vars)
+		}
 	}
 }

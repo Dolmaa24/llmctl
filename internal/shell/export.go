@@ -3,12 +3,14 @@ package shell
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 )
+
+var validVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // SystemRenderer renders environment variables in the syntax of the target shell.
 type SystemRenderer struct{}
@@ -20,6 +22,9 @@ func (SystemRenderer) Snippet(kind Kind, vars map[string]string) (string, error)
 
 	keys := make([]string, 0, len(vars))
 	for k := range vars {
+		if !validVarName.MatchString(k) {
+			return "", fmt.Errorf("invalid environment variable name %q", k)
+		}
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -67,61 +72,15 @@ func (SystemSyncer) Sync() (bool, error) {
 	return false, nil
 }
 
-// SystemExporter provides the legacy Export method for backward compatibility.
-type SystemExporter struct {
-	Writer io.Writer
-	Setenv func(string, string) error
-}
-
-func (e SystemExporter) Export(kind Kind, vars map[string]string) error {
-	if len(vars) == 0 {
-		return nil
-	}
-
-	writer := e.Writer
-	if writer == nil {
-		writer = io.Discard
-	}
-
-	setenv := e.Setenv
-	if setenv == nil {
-		setenv = os.Setenv
-	}
-
-	keys := make([]string, 0, len(vars))
-	for k := range vars {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		v := vars[k]
-		if err := setenv(k, v); err != nil {
-			return fmt.Errorf("set env %s: %w", k, err)
-		}
-		switch kind {
-		case KindPowerShell:
-			if _, err := fmt.Fprintf(writer, "$env:%s='%s'\n", k, escapePowerShell(v)); err != nil {
-				return fmt.Errorf("write powershell export: %w", err)
-			}
-		case KindWSLBash:
-			if _, err := fmt.Fprintf(writer, "export %s='%s'\n", k, escapeBash(v)); err != nil {
-				return fmt.Errorf("write wsl export: %w", err)
-			}
-		default:
-			return fmt.Errorf("unsupported shell kind: %s", kind)
-		}
-	}
-
-	return nil
-}
-
-func (SystemExporter) Sync() (bool, error) {
-	return false, nil
-}
-
 func escapePowerShell(value string) string {
-	return strings.ReplaceAll(value, "'", "''")
+	r := strings.NewReplacer(
+		"'", "''",
+		"‘", "‘‘",
+		"’", "’’",
+		"‚", "‚‚",
+		"‛", "‛‛",
+	)
+	return r.Replace(value)
 }
 
 func escapeBash(value string) string {

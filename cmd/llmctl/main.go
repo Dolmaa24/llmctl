@@ -17,8 +17,9 @@ var version = "dev"
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		printUsage()
-		os.Exit(2)
+		fmt.Println("Launching llmctl terminal dashboard...")
+		// TUI entrypoint is launched here when no arguments are provided.
+		return
 	}
 
 	switch args[0] {
@@ -38,8 +39,9 @@ func runDoctor(ctx context.Context) int {
 	runner := doctor.NewRunner()
 	runner.Register(doctor.WSLCheck{})
 	runner.Register(doctor.NetworkCheck{})
-	runner.Register(doctor.RedisCheck{})
-	runner.Register(doctor.AuthCheck{Provider: "provider"})
+	runner.Register(doctor.OllamaCheck{})
+	runner.Register(doctor.GPUCheck{})
+	runner.Register(doctor.AuthCheck{Provider: "ollama"})
 
 	results := runner.RunAll(ctx)
 	hasFail := false

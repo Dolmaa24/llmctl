@@ -4,53 +4,100 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
 	"time"
 )
 
-type WSLCheck struct{}
+type CommandRunner func(ctx context.Context, name string, args ...string) ([]byte, error)
+
+type WSLCheck struct {
+	Getenv        func(string) string
+	CommandRunner CommandRunner
+	GOOS          string
+}
 
 func (WSLCheck) Name() string {
 	return "wsl_check"
 }
 
-func (WSLCheck) Run(ctx context.Context) CheckResult {
+func (c WSLCheck) Run(ctx context.Context) CheckResult {
 	result := CheckResult{Name: "wsl_check", CheckedAt: time.Now()}
-	if runtime.GOOS != "windows" {
+
+	getenv := c.Getenv
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+
+	goos := c.GOOS
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+
+	// 1. Check if running inside WSL
+	distro := getenv("WSL_DISTRO_NAME")
+	if distro != "" || getenv("WSL_INTEROP") != "" {
+		if distro == "" {
+			distro = "Ubuntu"
+		}
+		result.Status = StatusOK
+		result.Message = fmt.Sprintf("WSL2 active inside distro %s", distro)
+		return result
+	}
+
+	// 2. If non-Windows and not inside WSL
+	if goos != "windows" {
 		result.Status = StatusWarn
-		result.Message = "non-Windows environment; WSL check skipped"
+		result.Message = "WSL not detected (non-Windows and not inside WSL)"
 		return result
 	}
 
-	if _, err := exec.LookPath("wsl.exe"); err != nil {
-		result.Status = StatusFail
-		result.Message = "wsl.exe not found"
-		return result
-	}
-
-	checkCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	// 3. On Windows host, check wsl.exe status
+	checkCtx, cancel := context.WithTimeout(ctx, CheckTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(checkCtx, "wsl.exe", "--status")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-
-	if checkCtx.Err() == context.DeadlineExceeded {
-		result.Status = StatusWarn
-		result.Message = "wsl status check timed out"
-		return result
+	runCmd := c.CommandRunner
+	var outStr string
+	if runCmd != nil {
+		outBytes, err := runCmd(checkCtx, "wsl.exe", "--status")
+		if checkCtx.Err() == context.DeadlineExceeded {
+			result.Status = StatusWarn
+			result.Message = "wsl status check timed out"
+			return result
+		}
+		if err != nil {
+			result.Status = StatusFail
+			result.Message = fmt.Sprintf("wsl status failed: %v", err)
+			return result
+		}
+		outStr = string(outBytes)
+	} else {
+		if _, err := exec.LookPath("wsl.exe"); err != nil {
+			result.Status = StatusFail
+			result.Message = "wsl.exe not found"
+			return result
+		}
+		cmd := exec.CommandContext(checkCtx, "wsl.exe", "--status")
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+		err := cmd.Run()
+		if checkCtx.Err() == context.DeadlineExceeded {
+			result.Status = StatusWarn
+			result.Message = "wsl status check timed out"
+			return result
+		}
+		if err != nil {
+			result.Status = StatusFail
+			result.Message = fmt.Sprintf("wsl status failed: %v", err)
+			return result
+		}
+		outStr = out.String()
 	}
-	if err != nil {
-		result.Status = StatusFail
-		result.Message = fmt.Sprintf("wsl status failed: %v", err)
-		return result
-	}
 
-	summary := summarizeWSLStatus(out.String())
+	summary := summarizeWSLStatus(outStr)
 	if summary.DefaultVersion == "2" {
 		result.Status = StatusOK
 		result.Message = fmt.Sprintf("WSL2 ready (default distro: %s)", summary.DefaultDistro)

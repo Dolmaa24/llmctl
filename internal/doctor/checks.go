@@ -4,6 +4,7 @@ package doctor
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -62,9 +63,24 @@ func (r *DefaultRunner) Register(c Check) {
 }
 
 func (r *DefaultRunner) RunAll(ctx context.Context) []CheckResult {
-	results := make([]CheckResult, 0, len(r.checks))
-	for _, c := range r.checks {
-		results = append(results, c.Run(ctx))
+	if len(r.checks) == 0 {
+		return nil
 	}
+
+	results := make([]CheckResult, len(r.checks))
+	var wg sync.WaitGroup
+
+	runCtx, cancel := context.WithTimeout(ctx, CheckTimeout)
+	defer cancel()
+
+	for i, c := range r.checks {
+		wg.Add(1)
+		go func(idx int, chk Check) {
+			defer wg.Done()
+			results[idx] = chk.Run(runCtx)
+		}(i, c)
+	}
+
+	wg.Wait()
 	return results
 }
