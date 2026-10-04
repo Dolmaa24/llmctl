@@ -222,4 +222,3 @@ func TestRunnerPanicRecovery(t *testing.T) {
 		t.Fatalf("unexpected panic message: %s", results[1].Message)
 	}
 }
-
