@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 
@@ -118,9 +119,14 @@ func (r *NotesRepo) ListBySession(ctx context.Context, sessionID string, include
 	return out, nil
 }
 
+// MarkSuperseded requires the replacement to exist already, as the real
+// table's superseded_by foreign key does.
 func (r *NotesRepo) MarkSuperseded(ctx context.Context, noteID, supersededByID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if !slices.ContainsFunc(r.rows, func(n session.Note) bool { return n.ID == supersededByID }) {
+		return fmt.Errorf("mock: no note %q to supersede with", supersededByID)
+	}
 	for i := range r.rows {
 		if r.rows[i].ID == noteID {
 			r.rows[i].SupersededBy = &supersededByID
@@ -154,5 +160,38 @@ func (r *SwitchEventsRepo) ListBySession(ctx context.Context, sessionID string) 
 			out = append(out, e)
 		}
 	}
+	return out, nil
+}
+
+// ExtractionRunsRepo is an in-memory notes.Ledger / storage.ExtractionRunsRepo.
+type ExtractionRunsRepo struct {
+	mu   sync.Mutex
+	rows []session.ExtractionRun
+	seq  int
+}
+
+func NewExtractionRunsRepo() *ExtractionRunsRepo { return &ExtractionRunsRepo{} }
+
+func (r *ExtractionRunsRepo) Create(ctx context.Context, run *session.ExtractionRun) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if run.ID == "" {
+		r.seq++
+		run.ID = fmt.Sprintf("run-%d", r.seq)
+	}
+	r.rows = append(r.rows, *run)
+	return nil
+}
+
+func (r *ExtractionRunsRepo) ListBySession(ctx context.Context, sessionID string) ([]session.ExtractionRun, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []session.ExtractionRun
+	for _, run := range r.rows {
+		if run.SessionID == sessionID {
+			out = append(out, run)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
 	return out, nil
 }

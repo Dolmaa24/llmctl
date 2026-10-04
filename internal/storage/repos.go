@@ -31,3 +31,8 @@ type SwitchEventsRepo interface {
 	Create(ctx context.Context, e *session.SwitchEvent) error
 	ListBySession(ctx context.Context, sessionID string) ([]session.SwitchEvent, error)
 }
+
+type ExtractionRunsRepo interface {
+	Create(ctx context.Context, r *session.ExtractionRun) error
+	ListBySession(ctx context.Context, sessionID string) ([]session.ExtractionRun, error)
+}
