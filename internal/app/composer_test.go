@@ -253,6 +253,10 @@ func TestContextTooLargeNamesTheModelAndTheWayOut(t *testing.T) {
 		{"bare sentinel", provider.ErrContextTooLarge, ""},
 		{"with the window size", fmt.Errorf("%w: needs 9214 of 8192 tokens", provider.ErrContextTooLarge), "(needs 9214 of 8192 tokens)"},
 		{"wrapped by the adapter", fmt.Errorf("ollama: %w", provider.ErrContextTooLarge), ""},
+		// The wording of the Ollama adapter merged in #3: the counts come
+		// first, after the provider and model it names itself by.
+		{"counts before the sentinel", fmt.Errorf("ollama %s: about %d tokens will not fit in a window of %d: %w",
+			"gemma3:latest", 9214, 8192, provider.ErrContextTooLarge), "(about 9214 tokens will not fit in a window of 8192)"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -273,6 +277,12 @@ func TestContextTooLargeNamesTheModelAndTheWayOut(t *testing.T) {
 			}
 			if c.detail != "" && !strings.Contains(n, c.detail) {
 				t.Errorf("notice = %q, want the adapter's detail %q", n, c.detail)
+			}
+			if c.detail == "" && strings.Contains(n, "(") {
+				t.Errorf("notice = %q, shows detail the adapter did not give", n)
+			}
+			if got := strings.Count(n, "ollama"); got != 1 {
+				t.Errorf("notice names the provider %d times: %q", got, n)
 			}
 			if got := len(h.model().messages); got != before+1 {
 				t.Errorf("got %d messages, want %d: a refused request must not add a reply", got, before+1)

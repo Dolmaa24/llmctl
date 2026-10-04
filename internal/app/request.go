@@ -140,17 +140,42 @@ func (m Model) receive(r replyMsg) (tea.Model, tea.Cmd) {
 // can act on: which model refused, and that a model with a larger window will
 // take the conversation. Local models hit this far sooner than hosted ones.
 //
-// The contract gives the error no fields, so the window size appears only
-// when the adapter wraps the sentinel with it, for example
-// fmt.Errorf("%w: needs 9214 of 8192 tokens", provider.ErrContextTooLarge).
-// Whatever the adapter put after the sentinel is shown as given.
+// The contract gives the error no fields, so the token counts appear only
+// when the adapter wraps the sentinel with them, and adapters word that
+// differently. The Ollama adapter writes them first,
+// "ollama gemma3:latest: about 9214 tokens will not fit in a window of 8192: <sentinel>",
+// while fmt.Errorf("%w: needs 9214 of 8192 tokens", ...) puts them after.
+// Detail from either side is shown as given.
 func contextTooLargeNotice(providerID, model string, err error) string {
+	var details []string
+	if before, after, ok := strings.Cut(err.Error(), provider.ErrContextTooLarge.Error()); ok {
+		for _, d := range []string{leadingDetail(before, providerID, model), strings.TrimSpace(strings.TrimPrefix(after, ":"))} {
+			if d != "" {
+				details = append(details, d)
+			}
+		}
+	}
 	detail := ""
-	if _, after, ok := strings.Cut(err.Error(), provider.ErrContextTooLarge.Error()+": "); ok && after != "" {
-		detail = " (" + after + ")"
+	if len(details) > 0 {
+		detail = " (" + strings.Join(details, "; ") + ")"
 	}
 	return fmt.Sprintf("%s %s: the conversation is too long for this model's context window%s. "+
 		"Press tab, choose a model with a larger window, and press s to switch.", providerID, model, detail)
+}
+
+// leadingDetail is what an adapter wrote before the sentinel, without the
+// provider and model it may name itself by: the notice names them already.
+func leadingDetail(before, providerID, model string) string {
+	d := strings.TrimSuffix(strings.TrimSpace(before), ":")
+	for _, name := range []string{providerID + " " + model, providerID} {
+		if d == name {
+			return ""
+		}
+		if rest, ok := strings.CutPrefix(d, name+": "); ok {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return strings.TrimSpace(d)
 }
 
 // cancelRequest abandons the in-flight request immediately.
