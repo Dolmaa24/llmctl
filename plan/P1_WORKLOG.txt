@@ -1,0 +1,43 @@
+P1 WORKLOG (Phase 0 -> Phase 1)
+Owner: Ayush Kushwah (P1 - shell/doctor, Windows/WSL)
+
+BRANCHES
+- feature/ayush-shell-doctor (created from Dolmaa24/llmctl main)
+- p1/phase0-setup (initial personal baseline)
+- p1/phase1-shell-doctor (initial personal feature branch)
+
+PROGRESS
+- Phase 0: WSL2 status validated on machine (default distro Ubuntu, default version 2).
+- Phase 0: Connected to canonical team repository at https://github.com/Dolmaa24/llmctl.git.
+- Phase 1: Implemented shell contracts (`Kind`, `Detector`, `Renderer` / Snippet, `Launcher`, `Syncer`) in `internal/shell`.
+- Phase 1: Implemented shell detection and export formatting for PowerShell and WSL/Bash.
+- Phase 1: Implemented doctor contracts and concurrent `DefaultRunner` in `internal/doctor`.
+- Phase 1: Implemented checks: `wsl_check`, `network_check`, `ollama_check`, `gpu_check`, `auth_check`.
+- Phase 1: Added `llmctl doctor` command and verified diagnostics output on live Windows host + NVIDIA RTX GPU.
+- Phase 1: Added full unit tests with dependency injection for CI verification across shell and doctor modules.
+
+BRANCH REVIEW P1 CHECKLIST IMPLEMENTATION (4 Oct 2026)
+- [x] Deleted SystemExporter from internal/shell/export.go (prevents process environment mutation of decrypted keys per NFR-4).
+- [x] Windows shell detection updated to inspect parent process (powershell.exe / pwsh.exe accepted, cmd.exe yields error).
+- [x] Linux shell detection restricted strictly to WSL2 environment (returns error on plain Linux).
+- [x] WSLCheck reports StatusOK with distro name when running inside WSL2.
+- [x] Renderer.Snippet validates variable names against [A-Za-z_][A-Za-z0-9_]*.
+- [x] escapePowerShell doubles single quotes as well as smart curly quotes (‘ ’ ‚ ‛).
+- [x] NetworkCheck updated to target configured provider endpoints including local Ollama (http://127.0.0.1:11434).
+- [x] Replaced Redis check with OllamaCheck (/api/tags & /api/ps) and GPUCheck (nvidia-smi VRAM check).
+- [x] Runner.RunAll modified to execute checks concurrently bounded by doctor.CheckTimeout (2s).
+- [x] CommandRunner and Getenv dependency injection added to WSLCheck, GPUCheck, OllamaCheck, and NetworkCheck for CI testability.
+- [x] cmd/llmctl/main.go updated to launch TUI on no args, preserving doctor and version subcommands.
+- [x] Moved P1_WORKLOG.txt from root to plan/P1_WORKLOG.txt.
+
+NEW FROM REVIEWING 6c6933a (4 Oct 2026)
+- [x] Document consolidation: Design doc movement to DOCS/ deferred to dedicated docs PR.
+- [x] WSLCheck reports distro as "unknown" when running inside WSL with WSL_DISTRO_NAME unset (wsl_check.go).
+- [x] OllamaCheck verifies loaded models are running on GPU via size_vram > 0 in /api/ps (ollama_check.go).
+- [x] Runner.RunAll recovers panics in goroutines to prevent taking down status bar per NFR-5 (checks.go).
+
+ISSUES_AND_FIXES
+- Issue: `wsl.exe --status` output can contain null characters (`\x00`) on Windows environment.
+  Fix: added normalization in `summarizeWSLStatus()` before parsing fields.
+- Issue: Repositories had unrelated initial histories.
+  Fix: Created `feature/ayush-shell-doctor` directly off `Dolmaa24/main`, cleanly ported P1 files, updated module imports to `github.com/Dolmaa24/llmctl`, and satisfied interface contracts.
