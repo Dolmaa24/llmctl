@@ -3,8 +3,11 @@ package ollama
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Dolmaa24/llmctl/internal/provider"
 	"github.com/Dolmaa24/llmctl/internal/session"
@@ -40,5 +43,26 @@ func TestContextTooLargeSentinelFirst(t *testing.T) {
 	}
 	if !strings.HasPrefix(err.Error(), provider.ErrContextTooLarge.Error()) {
 		t.Errorf("sentinel should come first, got %q", err.Error())
+	}
+}
+
+// A model still loading can outlast the deadline while Ollama is running
+// fine, so the error must not tell the user it cannot be reached.
+func TestDeadlineIsNotReportedAsUnreachable(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	defer srv.Close()
+	defer close(release)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := New(Options{BaseURL: srv.URL}).SendMessage(ctx, "m",
+		[]session.Message{{Role: session.RoleUser, Content: "hi"}})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected a deadline error, got %v", err)
+	}
+	if strings.Contains(err.Error(), "cannot reach") || !strings.Contains(err.Error(), "did not answer in time") {
+		t.Errorf("deadline worded as unreachable: %q", err.Error())
 	}
 }

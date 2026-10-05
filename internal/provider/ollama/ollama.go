@@ -111,6 +111,15 @@ func (a *Adapter) call(ctx context.Context, method, path string, body, out any) 
 	}
 	resp, err := a.http.Do(req)
 	if err != nil {
+		// Running out of time is not the same as being unreachable: a model
+		// still loading into memory needs patience, not a restart.
+		var netErr net.Error
+		switch {
+		case errors.Is(ctx.Err(), context.Canceled):
+			return fmt.Errorf("request to Ollama was cancelled: %w", context.Canceled)
+		case errors.Is(ctx.Err(), context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():
+			return fmt.Errorf("Ollama at %s did not answer in time: %w", a.baseURL, context.DeadlineExceeded)
+		}
 		return fmt.Errorf("cannot reach Ollama at %s (is it running?): %w", a.baseURL, err)
 	}
 	defer resp.Body.Close()
