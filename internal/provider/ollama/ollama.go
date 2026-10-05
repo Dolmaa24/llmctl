@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -56,6 +59,7 @@ func New(o Options) *Adapter {
 	if !strings.HasPrefix(base, "http") {
 		base = "http://" + base
 	}
+	base = withDefaultPort(base)
 	if o.NumCtx <= 0 {
 		o.NumCtx = 8192
 	}
@@ -67,6 +71,17 @@ func New(o Options) *Adapter {
 		numCtx: o.NumCtx, keepAlive: o.KeepAlive,
 		http: &http.Client{Timeout: 5 * time.Minute},
 	}
+}
+
+// withDefaultPort adds Ollama's port 11434 to an http address that has none,
+// because a bare host such as "localhost" would otherwise go to port 80.
+func withDefaultPort(base string) string {
+	u, err := url.Parse(base)
+	if err != nil || u.Scheme != "http" || u.Hostname() == "" || u.Port() != "" {
+		return base
+	}
+	u.Host = net.JoinHostPort(u.Hostname(), "11434")
+	return u.String()
 }
 
 func (a *Adapter) Name() string { return "ollama" }
@@ -96,6 +111,15 @@ func (a *Adapter) call(ctx context.Context, method, path string, body, out any) 
 	}
 	resp, err := a.http.Do(req)
 	if err != nil {
+		// Running out of time is not the same as being unreachable: a model
+		// still loading into memory needs patience, not a restart.
+		var netErr net.Error
+		switch {
+		case errors.Is(ctx.Err(), context.Canceled):
+			return fmt.Errorf("request to Ollama was cancelled: %w", context.Canceled)
+		case errors.Is(ctx.Err(), context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():
+			return fmt.Errorf("Ollama at %s did not answer in time: %w", a.baseURL, context.DeadlineExceeded)
+		}
 		return fmt.Errorf("cannot reach Ollama at %s (is it running?): %w", a.baseURL, err)
 	}
 	defer resp.Body.Close()
@@ -159,6 +183,9 @@ func (a *Adapter) EstimateTokens(text string) int {
 }
 
 func (a *Adapter) SendMessage(ctx context.Context, model string, history []session.Message) (session.Message, error) {
+	if len(history) == 0 {
+		return session.Message{}, errors.New("ollama: cannot send an empty history")
+	}
 	type chatMsg struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
@@ -172,13 +199,14 @@ func (a *Adapter) SendMessage(ctx context.Context, model string, history []sessi
 	// Ollama silently drops the oldest tokens, so refuse up front instead.
 	if total+512 > a.numCtx {
 		return session.Message{}, fmt.Errorf(
-			"ollama %s: about %d tokens will not fit in a window of %d: %w",
-			model, total, a.numCtx, provider.ErrContextTooLarge)
+			"%w: ollama %s: about %d tokens will not fit in a window of %d",
+			provider.ErrContextTooLarge, model, total, a.numCtx)
 	}
 	body := map[string]any{
 		"model":      model,
 		"messages":   msgs,
 		"stream":     false,
+		"think":      false,
 		"keep_alive": a.keepAlive,
 		"options":    map[string]any{"num_ctx": a.numCtx},
 	}
